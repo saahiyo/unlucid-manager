@@ -7,6 +7,8 @@ import { ThemeToggle } from './components/ThemeToggle';
 
 import { Diamond, Layers, LogOut, RefreshCw, Zap } from 'lucide-react';
 
+import { DrawingCursor } from './components/DrawingCursor';
+
 function App() {
   const [profiles, setProfiles] = useState<ProfileState[]>([]);
   const [globalLoading, setGlobalLoading] = useState(false);
@@ -119,6 +121,7 @@ function App() {
   return (
     <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
     <div className="min-h-screen bg-zinc-50 dark:bg-[#09090b] text-zinc-900 dark:text-white font-sans pb-32 relative selection:bg-emerald-500/30 transition-colors duration-300">
+      <DrawingCursor />
       
       {/* Background Effects */}
       {/* Background Effects */}
