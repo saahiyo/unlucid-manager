@@ -127,7 +127,7 @@ function App() {
 
       {/* Header */}
       <header className="sticky top-4 z-40 max-w-[1600px] mx-auto px-4 lg:px-6">
-        <div className="bg-white/80 dark:bg-[#121214]/80 backdrop-blur-xl border border-zinc-200 dark:border-white/10 rounded-2xl shadow-xl dark:shadow-2xl flex items-center justify-between px-5 h-16 transition-colors duration-300">
+        <div className="bg-white/70 dark:bg-[#121214]/70 backdrop-blur-3xl border border-zinc-200 dark:border-white/10 rounded-2xl shadow-xl dark:shadow-2xl flex items-center justify-between px-5 h-16 transition-colors duration-300">
             
             {/* Logo Area */}
             <div className="flex items-center gap-3">
