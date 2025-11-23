@@ -28,25 +28,23 @@ A modern, high-performance dashboard for managing multiple Unlucid accounts, tra
 
 ## Configuration
 
-1.  **Set up your secrets:**
-    Rename `constants.example.ts` to `constants.ts`:
+1.  **Environment Variables:**
+    This project uses Environment Variables to manage secrets. You do not need a `constants.ts` file.
+
+    **Locally:**
+    Create a `.env` file in the root directory:
     ```bash
-    mv constants.example.ts constants.ts
+    cp .env.example .env
     ```
+    Open `.env` and paste your cookies JSON string into `VITE_COOKIES`.
 
-2.  **Add your cookies:**
-    Open `constants.ts` and add your account details.
-    > **Important:** `constants.ts` is git-ignored to protect your sensitive data. Never commit your real tokens.
+    **On Vercel:**
+    Go to your project settings > Environment Variables.
+    Add a new variable:
+    - **Key**: `VITE_COOKIES`
+    - **Value**: Your full cookies JSON string (e.g., `{"my_account": {...}}`).
 
-    ```typescript
-    export const DEFAULT_COOKIES: RawCookiesJson = {
-      "my_account": {
-        "gmail": "user@gmail.com",
-        "__Secure-authjs.callback-url": "...",
-        "__Secure-authjs.session-token": "..."
-      }
-    };
-    ```
+    > **Note:** The JSON string must be valid. You can minify it to a single line.
 
 ## Usage
 

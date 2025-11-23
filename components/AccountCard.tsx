@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ProfileState } from '../types';
 import { Card } from './Card';
-import { Gem, Clock, User, RefreshCw, Loader2, AlertTriangle, ChevronDown, ChevronUp, Copy, Check, Sparkles } from 'lucide-react';
+import { Gem, Clock, User, RefreshCw, Loader2, AlertTriangle, ChevronDown, Copy, Check, Sparkles } from 'lucide-react';
 
 interface AccountCardProps {
   profile: ProfileState;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ProfileState, RawCookiesJson } from './types';
-import { DEFAULT_COOKIES, URL_ACCOUNT, URL_CLAIM } from './constants';
+import { URL_ACCOUNT, URL_CLAIM } from './config';
 import { AccountCard } from './components/AccountCard';
 import { ThemeProvider } from './components/ThemeProvider';
 import { ThemeToggle } from './components/ThemeToggle';
@@ -15,9 +15,21 @@ function App() {
   const [globalLoading, setGlobalLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
 
-  // Initialize with default cookies
+  // Initialize with cookies from Env Var
   useEffect(() => {
-    handleLoadCookies(DEFAULT_COOKIES);
+    try {
+      const cookiesEnv = import.meta.env.VITE_COOKIES;
+      if (cookiesEnv) {
+        const parsedCookies = JSON.parse(cookiesEnv);
+        handleLoadCookies(parsedCookies);
+      } else {
+        console.warn('No VITE_COOKIES environment variable found.');
+        setInitialLoading(false);
+      }
+    } catch (e) {
+      console.error('Failed to parse VITE_COOKIES', e);
+      setInitialLoading(false);
+    }
   }, []);
 
   const handleLoadCookies = async (data: RawCookiesJson) => {
