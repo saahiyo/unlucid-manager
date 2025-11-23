@@ -11,6 +11,8 @@ A modern, high-performance dashboard for managing multiple Unlucid accounts, tra
 - **Dark/Light Mode**: Fully supported themes with a premium glassmorphism aesthetic.
 - **Secure**: Your tokens are stored locally in your configuration file.
 
+A modern, high-performance dashboard for managing multiple Unlucid accounts, tracking gems, and automating claims. Built with React, Vite, and Tailwind CSS.
+
 ## Installation
 
 1.  **Clone the repository:**
