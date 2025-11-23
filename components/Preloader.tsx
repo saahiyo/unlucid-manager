@@ -3,19 +3,27 @@ import { Diamond } from 'lucide-react';
 
 interface PreloaderProps {
   onFinish: () => void;
+  isLoading: boolean;
 }
 
-export const Preloader: React.FC<PreloaderProps> = ({ onFinish }) => {
+export const Preloader: React.FC<PreloaderProps> = ({ onFinish, isLoading }) => {
   const [exiting, setExiting] = useState(false);
+  const [minTimeElapsed, setMinTimeElapsed] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      setExiting(true);
-      setTimeout(onFinish, 500); // Wait for exit animation
-    }, 2000); // Show for 2 seconds
+      setMinTimeElapsed(true);
+    }, 2000); // Show for at least 2 seconds
 
     return () => clearTimeout(timer);
-  }, [onFinish]);
+  }, []);
+
+  useEffect(() => {
+    if (!isLoading && minTimeElapsed && !exiting) {
+        setExiting(true);
+        setTimeout(onFinish, 500); // Wait for exit animation
+    }
+  }, [isLoading, minTimeElapsed, onFinish, exiting]);
 
   if (exiting) {
       return (

@@ -20,7 +20,7 @@ function App() {
     handleLoadCookies(DEFAULT_COOKIES);
   }, []);
 
-  const handleLoadCookies = (data: RawCookiesJson) => {
+  const handleLoadCookies = async (data: RawCookiesJson) => {
     const newProfiles: ProfileState[] = Object.entries(data).map(([key, cookies]) => ({
       id: key,
       config: { name: key, cookies },
@@ -29,7 +29,8 @@ function App() {
     }));
     setProfiles(newProfiles);
     // Automatically fetch data for new profiles
-    newProfiles.forEach(p => fetchAccountData(p.id, p.config.cookies));
+    await Promise.all(newProfiles.map(p => fetchAccountData(p.id, p.config.cookies)));
+    setInitialLoading(false);
   };
 
   const fetchAccountData = async (id: string, cookies?: Record<string, string>) => {
@@ -123,7 +124,7 @@ function App() {
   return (
     <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
     <div className="min-h-screen bg-zinc-50 dark:bg-[#09090b] text-zinc-900 dark:text-white font-sans pb-32 relative selection:bg-emerald-500/30 transition-colors duration-300">
-      {initialLoading && <Preloader onFinish={() => setInitialLoading(false)} />}
+      {initialLoading && <Preloader onFinish={() => setInitialLoading(false)} isLoading={initialLoading} />}
       <DrawingCursor />
       
       {/* Background Effects */}
