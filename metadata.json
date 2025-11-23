@@ -1,0 +1,5 @@
+{
+  "name": "Unlucid Gem Manager",
+  "description": "A sleek, dark-themed dashboard to manage Unlucid.ai accounts, view gem statistics, and batch claim free credits.",
+  "requestFramePermissions": []
+}
