@@ -9,28 +9,91 @@ import { Diamond, Layers, LogOut, RefreshCw, Zap } from 'lucide-react';
 
 import { DrawingCursor } from './components/DrawingCursor';
 import { Preloader } from './components/Preloader';
+import { CookieImportModal } from './components/CookieImportModal';
+import { Upload } from 'lucide-react';
 
 function App() {
   const [profiles, setProfiles] = useState<ProfileState[]>([]);
   const [globalLoading, setGlobalLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
-  // Initialize with cookies from Env Var
+  // Initialize with cookies from Env Var and LocalStorage
   useEffect(() => {
-    try {
-      const cookiesEnv = import.meta.env.VITE_COOKIES;
-      if (cookiesEnv) {
-        const parsedCookies = JSON.parse(cookiesEnv);
-        handleLoadCookies(parsedCookies);
+    const loadAllCookies = () => {
+      let combinedCookies: RawCookiesJson = {};
+
+      // 1. Load from Env
+      try {
+        const cookiesEnv = import.meta.env.VITE_COOKIES;
+        if (cookiesEnv) {
+          const parsedEnv = JSON.parse(cookiesEnv);
+          combinedCookies = { ...combinedCookies, ...parsedEnv };
+        }
+      } catch (e) {
+        console.error('Failed to parse VITE_COOKIES', e);
+      }
+
+      // 2. Load from LocalStorage
+      try {
+        const localCookies = localStorage.getItem('unlucid_imported_cookies');
+        if (localCookies) {
+          const parsedLocal = JSON.parse(localCookies);
+          combinedCookies = { ...combinedCookies, ...parsedLocal };
+        }
+      } catch (e) {
+        console.error('Failed to parse local cookies', e);
+      }
+
+      if (Object.keys(combinedCookies).length > 0) {
+        handleLoadCookies(combinedCookies);
       } else {
-        console.warn('No VITE_COOKIES environment variable found.');
+        // console.warn('No cookies found.');
         setInitialLoading(false);
       }
-    } catch (e) {
-      console.error('Failed to parse VITE_COOKIES', e);
-      setInitialLoading(false);
-    }
+    };
+
+    loadAllCookies();
   }, []);
+
+  const handleSaveImportedCookies = (importedAccounts: { name: string; token: string }[]) => {
+    // Convert array to RawCookiesJson format
+    const newCookies: RawCookiesJson = {};
+    importedAccounts.forEach(acc => {
+      newCookies[acc.name] = {
+        "__Secure-authjs.session-token": acc.token
+      };
+    });
+
+    // Save to LocalStorage
+    localStorage.setItem('unlucid_imported_cookies', JSON.stringify(newCookies));
+
+    // Merge with Env cookies and reload
+    let combinedCookies: RawCookiesJson = { ...newCookies };
+    try {
+        const cookiesEnv = import.meta.env.VITE_COOKIES;
+        if (cookiesEnv) {
+             const parsedEnv = JSON.parse(cookiesEnv);
+             combinedCookies = { ...parsedEnv, ...combinedCookies };
+        }
+    } catch(e) {}
+    
+    handleLoadCookies(combinedCookies);
+  };
+
+  const getImportedCookiesForModal = () => {
+      try {
+          const localCookies = localStorage.getItem('unlucid_imported_cookies');
+          if (localCookies) {
+              const parsed = JSON.parse(localCookies);
+              return Object.entries(parsed).map(([name, cookies]: [string, any]) => ({
+                  name,
+                  token: cookies["__Secure-authjs.session-token"] || ""
+              }));
+          }
+      } catch (e) {}
+      return [];
+  };
 
   const handleLoadCookies = async (data: RawCookiesJson) => {
     const newProfiles: ProfileState[] = Object.entries(data).map(([key, cookies]) => ({
@@ -195,6 +258,13 @@ function App() {
              </h2>
 
             <div className="flex gap-2 w-full sm:w-auto">
+                <button 
+                    onClick={() => setIsImportModalOpen(true)}
+                    className="px-4 py-2.5 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 text-zinc-700 dark:text-white rounded-lg text-xs font-bold transition-all flex items-center gap-2 shadow-sm dark:shadow-none"
+                >
+                    <Upload size={14} />
+                    Import
+                </button>
                 {profiles.length > 0 && (
                     <>
 
@@ -232,8 +302,15 @@ function App() {
                 <h3 className="text-xl font-bold text-zinc-900 dark:text-white mb-2">No accounts active</h3>
                 <p className="text-zinc-500 max-w-sm mx-auto mb-8 text-sm leading-relaxed">
                     Get started by importing your session cookies. <br/>
-                    <span className="text-xs text-zinc-600 mt-2 block">Use the extension to export your profiles.</span>
+                    <span className="text-xs text-zinc-600 mt-2 block">Use the extension to export your profiles or add them manually.</span>
                 </p>
+                <button 
+                    onClick={() => setIsImportModalOpen(true)}
+                    className="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40 transition-all flex items-center gap-2 mx-auto"
+                >
+                    <Upload size={16} />
+                    Import Cookies
+                </button>
 
              </div>
         ) : (
@@ -257,6 +334,13 @@ function App() {
           Unlucid Manager v2.0 • <span className="text-zinc-500">System Active</span>
         </p>
       </footer>
+
+      <CookieImportModal 
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onSave={handleSaveImportedCookies}
+        initialData={getImportedCookiesForModal()}
+      />
       
     </div>
     </ThemeProvider>
