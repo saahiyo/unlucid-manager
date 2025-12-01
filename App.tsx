@@ -10,7 +10,7 @@ import { Diamond, Layers, LogOut, RefreshCw, Zap } from 'lucide-react';
 import { DrawingCursor } from './components/DrawingCursor';
 import { Preloader } from './components/Preloader';
 import { CookieImportModal } from './components/CookieImportModal';
-import { Upload } from 'lucide-react';
+import { Import } from 'lucide-react';
 
 function App() {
   const [profiles, setProfiles] = useState<ProfileState[]>([]);
@@ -262,7 +262,7 @@ function App() {
                     onClick={() => setIsImportModalOpen(true)}
                     className="px-4 py-2.5 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 text-zinc-700 dark:text-white rounded-lg text-xs font-bold transition-all flex items-center gap-2 shadow-sm dark:shadow-none"
                 >
-                    <Upload size={14} />
+                    <Import size={14} />
                     Import
                 </button>
                 {profiles.length > 0 && (
@@ -308,7 +308,7 @@ function App() {
                     onClick={() => setIsImportModalOpen(true)}
                     className="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40 transition-all flex items-center gap-2 mx-auto"
                 >
-                    <Upload size={16} />
+                    <Import size={16} />
                     Import Cookies
                 </button>
 

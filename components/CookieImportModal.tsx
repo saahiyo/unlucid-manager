@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Save, Upload } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Plus, Trash2, Save, Import, Download, FileJson } from 'lucide-react';
 
 interface CookieImportModalProps {
   isOpen: boolean;
@@ -10,6 +10,7 @@ interface CookieImportModalProps {
 
 export function CookieImportModal({ isOpen, onClose, onSave, initialData = [] }: CookieImportModalProps) {
   const [accounts, setAccounts] = useState<{ name: string; token: string; id: string }[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -40,6 +41,76 @@ export function CookieImportModal({ isOpen, onClose, onSave, initialData = [] }:
     onClose();
   };
 
+  const handleExportJson = () => {
+    const validAccounts = accounts.filter(a => a.name.trim() !== '' && a.token.trim() !== '');
+    const exportData: Record<string, any> = {};
+    
+    validAccounts.forEach(acc => {
+      exportData[acc.name] = {
+        "__Secure-authjs.session-token": acc.token
+      };
+    });
+
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
+    const downloadAnchorNode = document.createElement('a');
+    downloadAnchorNode.setAttribute("href", dataStr);
+    downloadAnchorNode.setAttribute("download", "unlucid_cookies_backup.json");
+    document.body.appendChild(downloadAnchorNode); // required for firefox
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result as string;
+        const parsed = JSON.parse(content);
+        
+        // Convert from RawCookiesJson to our internal format
+        const newAccounts: { name: string; token: string; id: string }[] = [];
+        
+        Object.entries(parsed).forEach(([name, cookies]: [string, any], index) => {
+            if (cookies && cookies["__Secure-authjs.session-token"]) {
+                newAccounts.push({
+                    name: name,
+                    token: cookies["__Secure-authjs.session-token"],
+                    id: `imported-${Date.now()}-${index}`
+                });
+            }
+        });
+
+        if (newAccounts.length > 0) {
+            // Append to existing or replace? Let's append for now, but if the first row is empty, replace it.
+            setAccounts(prev => {
+                const hasEmptyStart = prev.length === 1 && prev[0].name === '' && prev[0].token === '';
+                if (hasEmptyStart) {
+                    return newAccounts;
+                }
+                return [...prev, ...newAccounts];
+            });
+        } else {
+            alert("No valid cookies found in the file.");
+        }
+
+      } catch (err) {
+        console.error("Failed to parse JSON", err);
+        alert("Invalid JSON file");
+      }
+      
+      // Reset input
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+    reader.readAsText(file);
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -50,19 +121,43 @@ export function CookieImportModal({ isOpen, onClose, onSave, initialData = [] }:
         <div className="flex items-center justify-between p-6 border-b border-zinc-100 dark:border-zinc-800">
           <div>
             <h2 className="text-xl font-bold text-zinc-900 dark:text-white flex items-center gap-2">
-              <Upload size={20} className="text-emerald-500" />
+              <Import size={20} className="text-emerald-500" />
               Import Cookies
             </h2>
             <p className="text-sm text-zinc-500 mt-1">
               Add your accounts by providing a name and the <code className="bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded text-xs font-mono text-emerald-600 dark:text-emerald-400">__Secure-authjs.session-token</code> cookie value.
             </p>
           </div>
-          <button 
-            onClick={onClose}
-            className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
-          >
-            <X size={20} />
-          </button>
+          <div className="flex items-center gap-2">
+             <button 
+                onClick={handleExportJson}
+                className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors text-zinc-500 hover:text-emerald-600 dark:hover:text-emerald-400"
+                title="Export to JSON"
+            >
+                <Download size={20} />
+            </button>
+            <button 
+                onClick={handleImportClick}
+                className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors text-zinc-500 hover:text-emerald-600 dark:hover:text-emerald-400"
+                title="Import from JSON"
+            >
+                <FileJson size={20} />
+            </button>
+            <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleFileChange} 
+                accept=".json" 
+                className="hidden" 
+            />
+            <div className="w-px h-6 bg-zinc-200 dark:bg-zinc-800 mx-1"></div>
+            <button 
+                onClick={onClose}
+                className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
+            >
+                <X size={20} />
+            </button>
+          </div>
         </div>
 
         {/* Content */}
