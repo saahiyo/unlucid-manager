@@ -5,12 +5,11 @@ import { AccountCard } from './components/AccountCard';
 import { ThemeProvider } from './components/ThemeProvider';
 import { ThemeToggle } from './components/ThemeToggle';
 
-import { Diamond, Layers, LogOut, RefreshCw, Zap } from 'lucide-react';
+import { Diamond, Layers, LogOut, RefreshCw, Zap, Import, Download } from 'lucide-react';
 
 import { DrawingCursor } from './components/DrawingCursor';
 import { Preloader } from './components/Preloader';
 import { CookieImportModal } from './components/CookieImportModal';
-import { Import } from 'lucide-react';
 
 function App() {
   const [profiles, setProfiles] = useState<ProfileState[]>([]);
@@ -93,6 +92,21 @@ function App() {
           }
       } catch (e) {}
       return [];
+  };
+
+  const handleExportCookies = () => {
+    const exportData: RawCookiesJson = {};
+    profiles.forEach(p => {
+        exportData[p.config.name] = p.config.cookies;
+    });
+
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
+    const downloadAnchorNode = document.createElement('a');
+    downloadAnchorNode.setAttribute("href", dataStr);
+    downloadAnchorNode.setAttribute("download", "unlucid_cookies_export.json");
+    document.body.appendChild(downloadAnchorNode);
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
   };
 
   const handleLoadCookies = async (data: RawCookiesJson) => {
@@ -264,6 +278,14 @@ function App() {
                 >
                     <Import size={14} />
                     Import
+                </button>
+                <button 
+                    onClick={handleExportCookies}
+                    disabled={profiles.length === 0}
+                    className={`px-4 py-2.5 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 text-zinc-700 dark:text-white rounded-lg text-xs font-bold transition-all flex items-center gap-2 shadow-sm dark:shadow-none ${profiles.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                    <Download size={14} />
+                    Export
                 </button>
                 {profiles.length > 0 && (
                     <>
