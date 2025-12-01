@@ -1,7 +1,9 @@
+// 'use client';
 import React, { useState, useEffect } from 'react';
 import { ProfileState } from '../types';
 import { Card } from './Card';
 import { Gem, Clock, User, RefreshCw, Loader2, AlertTriangle, ChevronDown, Copy, Check, Sparkles } from 'lucide-react';
+import { SlidingNumber } from './motion-primitives/sliding-number';
 
 interface AccountCardProps {
   profile: ProfileState;
@@ -10,7 +12,7 @@ interface AccountCardProps {
 }
 
 export const AccountCard: React.FC<AccountCardProps> = ({ profile, onClaim, onRefresh }) => {
-  const [timeLeft, setTimeLeft] = useState<string>('--:--:--');
+  const [timeLeft, setTimeLeft] = useState<{ h: number; m: number; s: number } | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -25,7 +27,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({ profile, onClaim, onRe
       const diff = data.nextFreeGemsAt - now;
 
       if (diff <= 0) {
-        setTimeLeft('00:00:00');
+        setTimeLeft({ h: 0, m: 0, s: 0 });
         setIsReady(true);
         return;
       }
@@ -35,8 +37,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({ profile, onClaim, onRe
       const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
       const seconds = Math.floor((diff % (1000 * 60)) / 1000);
 
-      const pad = (num: number) => num.toString().padStart(2, '0');
-      setTimeLeft(`${pad(hours)}:${pad(minutes)}:${pad(seconds)}`);
+      setTimeLeft({ h: hours, m: minutes, s: seconds });
     };
 
     calculateTime();
@@ -53,9 +54,6 @@ export const AccountCard: React.FC<AccountCardProps> = ({ profile, onClaim, onRe
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
-
-  // Calculate progress percentage for the bar (assume 24h cycle for visuals or just static feedback)
-  // A simple pulsing dot is cleaner for the "Ready" state.
 
   return (
     <Card 
@@ -112,8 +110,8 @@ export const AccountCard: React.FC<AccountCardProps> = ({ profile, onClaim, onRe
               <div className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider mb-1 flex items-center gap-1">
                 <Gem size={10} className="text-purple-500" /> Balance
               </div>
-              <div className="text-xl font-mono font-bold text-zinc-800 dark:text-zinc-200 group-hover:text-zinc-900 dark:group-hover:text-white transition-colors">
-                {data.gems.toLocaleString()}
+              <div className="text-xl font-mono font-bold text-zinc-800 dark:text-zinc-200 group-hover:text-zinc-900 dark:group-hover:text-white transition-colors pt-2">
+                <SlidingNumber value={data.gems} />
               </div>
             </div>
 
@@ -131,7 +129,17 @@ export const AccountCard: React.FC<AccountCardProps> = ({ profile, onClaim, onRe
                 )}
               </div>
               <div className={`text-xl font-mono font-bold transition-colors ${isReady ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-400'}`}>
-                {isReady ? 'Now' : timeLeft}
+                {isReady ? 'Now' : (
+                  timeLeft ? (
+                    <div className="flex items-center">
+                      <SlidingNumber value={timeLeft.h} padStart />
+                      <span className="mx-[1px]">:</span>
+                      <SlidingNumber value={timeLeft.m} padStart />
+                      <span className="mx-[1px]" >:</span>
+                      <SlidingNumber value={timeLeft.s} padStart />
+                    </div>
+                  ) : '--:--:--'
+                )}
               </div>
             </div>
           </div>
