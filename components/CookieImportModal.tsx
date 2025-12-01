@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Plus, Trash2, Save, Import, Download, FileJson } from 'lucide-react';
+import { X, Plus, Trash2, Save, Import, FileJson } from 'lucide-react';
 
 interface CookieImportModalProps {
   isOpen: boolean;
@@ -41,24 +41,7 @@ export function CookieImportModal({ isOpen, onClose, onSave, initialData = [] }:
     onClose();
   };
 
-  const handleExportJson = () => {
-    const validAccounts = accounts.filter(a => a.name.trim() !== '' && a.token.trim() !== '');
-    const exportData: Record<string, any> = {};
-    
-    validAccounts.forEach(acc => {
-      exportData[acc.name] = {
-        "__Secure-authjs.session-token": acc.token
-      };
-    });
 
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
-    const downloadAnchorNode = document.createElement('a');
-    downloadAnchorNode.setAttribute("href", dataStr);
-    downloadAnchorNode.setAttribute("download", "unlucid_cookies_backup.json");
-    document.body.appendChild(downloadAnchorNode); // required for firefox
-    downloadAnchorNode.click();
-    downloadAnchorNode.remove();
-  };
 
   const handleImportClick = () => {
     fileInputRef.current?.click();
@@ -129,13 +112,7 @@ export function CookieImportModal({ isOpen, onClose, onSave, initialData = [] }:
             </p>
           </div>
           <div className="flex items-center gap-2">
-             <button 
-                onClick={handleExportJson}
-                className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors text-zinc-500 hover:text-emerald-600 dark:hover:text-emerald-400"
-                title="Export to JSON"
-            >
-                <Download size={20} />
-            </button>
+
             <button 
                 onClick={handleImportClick}
                 className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors text-zinc-500 hover:text-emerald-600 dark:hover:text-emerald-400"
