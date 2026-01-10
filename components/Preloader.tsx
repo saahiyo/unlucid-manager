@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { Diamond } from 'lucide-react';
-// import { TextShimmer } from './motion-primitives/text-shimmer';
 
 interface PreloaderProps {
   onFinish: () => void;

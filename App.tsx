@@ -198,6 +198,7 @@ function App() {
     });
 
     await Promise.all(eligible.map(p => claimGems(p.id)));
+    handleRefreshAll();
     setGlobalLoading(false);
   };
 
