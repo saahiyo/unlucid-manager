@@ -24,7 +24,29 @@ export const DrawingCursor: React.FC = () => {
     };
 
     const handleMouseMove = (e: MouseEvent) => {
-      pointsRef.current.push({ x: e.clientX, y: e.clientY, age: 0 });
+      const newPoint = { x: e.clientX, y: e.clientY, age: 0 };
+      
+      const lastPoint = pointsRef.current[pointsRef.current.length - 1];
+      
+      if (lastPoint) {
+        const dx = newPoint.x - lastPoint.x;
+        const dy = newPoint.y - lastPoint.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        // Add more points for smoother line
+        const steps = Math.max(Math.floor(distance / 2), 1); // 1 point every 2 pixels
+        
+        for (let i = 1; i < steps; i++) {
+          const t = i / steps;
+          pointsRef.current.push({
+            x: lastPoint.x + dx * t,
+            y: lastPoint.y + dy * t,
+            age: 0
+          });
+        }
+      }
+      
+      pointsRef.current.push(newPoint);
     };
 
     window.addEventListener('resize', handleResize);
