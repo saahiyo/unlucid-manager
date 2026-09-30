@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Plus, Trash2, Save, Import, FileJson } from 'lucide-react';
-import { getPrimaryToken } from '../cookieUtils';
+import { getPrimaryToken, parseCookiesInput } from '../cookieUtils';
 
 interface CookieImportModalProps {
   isOpen: boolean;
@@ -38,7 +38,21 @@ export function CookieImportModal({ isOpen, onClose, onSave, initialData = [] }:
   const handleSave = () => {
     // Filter out empty rows
     const validAccounts = accounts.filter(a => a.name.trim() !== '' && a.token.trim() !== '');
-    onSave(validAccounts);
+
+    // Deduplicate accounts by primary token so no two rows have the same session token
+    const seenTokens = new Set<string>();
+    const deduplicated: { name: string; token: string }[] = [];
+
+    for (const acc of validAccounts) {
+      const parsedCookies = parseCookiesInput(acc.token);
+      const tokenKey = getPrimaryToken(parsedCookies) || acc.token.trim();
+      if (!seenTokens.has(tokenKey)) {
+        seenTokens.add(tokenKey);
+        deduplicated.push({ name: acc.name.trim(), token: acc.token.trim() });
+      }
+    }
+
+    onSave(deduplicated);
     onClose();
   };
 

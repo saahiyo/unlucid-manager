@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { X, UserPlus, Eye, EyeOff, Clipboard, AlertCircle, Loader2 } from 'lucide-react';
+import { parseCookiesInput, getPrimaryToken } from '../cookieUtils';
 
 interface AddAccountModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAdd: (name: string, token: string) => Promise<void> | void;
   existingNames: string[];
+  existingTokens?: { name: string; token: string }[];
   suggestedName?: string;
 }
 
@@ -14,6 +16,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
   onClose,
   onAdd,
   existingNames,
+  existingTokens = [],
   suggestedName = ''
 }) => {
   const [name, setName] = useState('');
@@ -78,6 +81,20 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
     if (!sanitizedToken) {
       setError('Please enter or paste the session token.');
       return;
+    }
+
+    // Check duplicate session token
+    const newCookies = parseCookiesInput(sanitizedToken);
+    const parsedPrimaryToken = getPrimaryToken(newCookies);
+
+    if (parsedPrimaryToken && existingTokens.length > 0) {
+      const duplicate = existingTokens.find(
+        t => t.token && (t.token === parsedPrimaryToken || t.token.includes(parsedPrimaryToken) || parsedPrimaryToken.includes(t.token))
+      );
+      if (duplicate) {
+        setError(`This session token is already in use by account "${duplicate.name}". Duplicate accounts are not allowed.`);
+        return;
+      }
     }
 
     setIsSubmitting(true);

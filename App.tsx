@@ -73,8 +73,36 @@ function App() {
         console.error('Failed to parse deleted accounts', e);
       }
 
-      if (Object.keys(combinedCookies).length > 0) {
-        handleLoadCookies(combinedCookies);
+      // 4. Deduplicate entries sharing the exact same primary session token
+      const deduplicatedCookies: RawCookiesJson = {};
+      const seenTokens = new Map<string, string>(); // token -> existingKey
+
+      Object.entries(combinedCookies).forEach(([key, cookies]) => {
+        const token = getPrimaryToken(cookies);
+        if (!token) {
+          deduplicatedCookies[key] = cookies;
+          return;
+        }
+
+        const existingKey = seenTokens.get(token);
+        if (!existingKey) {
+          seenTokens.set(token, key);
+          deduplicatedCookies[key] = cookies;
+        } else {
+          // If collision occurs and this key has a custom/human name while the existing one is generic, prefer custom name
+          const existingIsGeneric = /^account \d+$/i.test(existingKey);
+          const currentIsGeneric = /^account \d+$/i.test(key);
+
+          if (existingIsGeneric && !currentIsGeneric) {
+            delete deduplicatedCookies[existingKey];
+            seenTokens.set(token, key);
+            deduplicatedCookies[key] = cookies;
+          }
+        }
+      });
+
+      if (Object.keys(deduplicatedCookies).length > 0) {
+        handleLoadCookies(deduplicatedCookies);
       } else {
         // console.warn('No cookies found.');
         setInitialLoading(false);
@@ -85,10 +113,23 @@ function App() {
   }, []);
 
   const handleSaveImportedCookies = (importedAccounts: { name: string; token: string }[]) => {
+    // Deduplicate imported accounts by primary token
+    const seenTokens = new Set<string>();
+    const deduplicatedAccounts: { name: string; token: string }[] = [];
+
+    importedAccounts.forEach(acc => {
+      const parsed = parseCookiesInput(acc.token);
+      const token = getPrimaryToken(parsed) || acc.token.trim();
+      if (!seenTokens.has(token)) {
+        seenTokens.add(token);
+        deduplicatedAccounts.push(acc);
+      }
+    });
+
     // Convert array to RawCookiesJson format using universal parser
     const newCookies: RawCookiesJson = {};
     const importedNames: string[] = [];
-    importedAccounts.forEach(acc => {
+    deduplicatedAccounts.forEach(acc => {
       newCookies[acc.name] = parseCookiesInput(acc.token);
       importedNames.push(acc.name);
     });
@@ -244,10 +285,32 @@ function App() {
     return profiles.map(p => p.config.name);
   }, [profiles]);
 
+  const existingAccountTokens = useMemo(() => {
+    return profiles
+      .map(p => ({
+        name: p.config.name,
+        token: getPrimaryToken(p.config.cookies)
+      }))
+      .filter((t): t is { name: string; token: string } => Boolean(t.token));
+  }, [profiles]);
+
   const handleAddAccount = async (name: string, token: string) => {
     const trimmedName = name.trim();
     const trimmedToken = token.trim();
     if (!trimmedName || !trimmedToken) return;
+
+    const newCookiesRecord = parseCookiesInput(trimmedToken);
+    const newPrimaryToken = getPrimaryToken(newCookiesRecord);
+
+    if (newPrimaryToken) {
+      const duplicate = profiles.find(p => {
+        const pt = getPrimaryToken(p.config.cookies);
+        return pt && (pt === newPrimaryToken || pt.includes(newPrimaryToken) || newPrimaryToken.includes(pt));
+      });
+      if (duplicate) {
+        throw new Error(`This session token is already in use by account "${duplicate.config.name}".`);
+      }
+    }
 
     let localCookies: RawCookiesJson = {};
     try {
@@ -269,7 +332,6 @@ function App() {
       }
     } catch (e) {}
 
-    const newCookiesRecord = parseCookiesInput(trimmedToken);
     localCookies[trimmedName] = newCookiesRecord;
     localStorage.setItem('unlucid_imported_cookies', JSON.stringify(localCookies));
 
@@ -440,6 +502,32 @@ function App() {
         referralReward: userObj.referralReward || 0,
         isAdmin: Boolean(userObj.isAdmin),
       };
+
+      // Runtime Deduplication: Check if another card already represents this exact user or session token
+      const currentToken = getPrimaryToken(currentCookies);
+      const existingDuplicate = profilesRef.current.find(p => {
+        if (p.id === id) return false;
+        if (currentToken && getPrimaryToken(p.config.cookies) === currentToken) return true;
+        if (normalizedData.id && p.data?.id && p.data.id === normalizedData.id) return true;
+        if (normalizedData.email && p.data?.email && p.data.email.toLowerCase() === normalizedData.email.toLowerCase()) return true;
+        return false;
+      });
+
+      if (existingDuplicate) {
+        console.warn(`Duplicate account detected for "${id}" matching existing "${existingDuplicate.id}". Pruning duplicate card.`);
+        setProfiles(prev => prev.filter(p => p.id !== id));
+        try {
+          const stored = localStorage.getItem('unlucid_imported_cookies');
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (parsed[id]) {
+              delete parsed[id];
+              localStorage.setItem('unlucid_imported_cookies', JSON.stringify(parsed));
+            }
+          }
+        } catch (e) {}
+        return;
+      }
 
       setProfiles(prev => prev.map(p => {
           if (p.id !== id) return p;
@@ -855,6 +943,7 @@ function App() {
         onClose={() => setIsAddModalOpen(false)}
         onAdd={handleAddAccount}
         existingNames={existingAccountNames}
+        existingTokens={existingAccountTokens}
         suggestedName={suggestedAccountName}
       />
       
