@@ -2,29 +2,81 @@
 import React, { useState, useEffect } from 'react';
 import { ProfileState } from '../types';
 import { Card } from './Card';
-import { Gem, Clock, User, RefreshCw, Loader2, AlertTriangle, ChevronDown, Copy, Check, Sparkles } from 'lucide-react';
+import { 
+  Gem, 
+  Clock, 
+  User, 
+  RefreshCw, 
+  Loader2, 
+  AlertTriangle, 
+  ChevronDown, 
+  Copy, 
+  Check, 
+  Sparkles,
+  Pencil,
+  Trash2,
+  X,
+  Eye,
+  EyeOff,
+  Save,
+  Key,
+  Mail
+} from 'lucide-react';
 import { SlidingNumber } from './motion-primitives/sliding-number';
+import { getPrimaryToken } from '../cookieUtils';
 
 interface AccountCardProps {
   profile: ProfileState;
   onClaim: (id: string) => void;
   onRefresh: (id: string) => void;
+  onUpdate: (id: string, newName: string, newToken: string) => Promise<void> | void;
+  onDelete: (id: string) => void;
 }
 
-export const AccountCard: React.FC<AccountCardProps> = ({ profile, onClaim, onRefresh }) => {
+export const AccountCard: React.FC<AccountCardProps> = ({ 
+  profile, 
+  onClaim, 
+  onRefresh,
+  onUpdate,
+  onDelete
+}) => {
   const [timeLeft, setTimeLeft] = useState<{ h: number; m: number; s: number } | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copiedEmail, setCopiedEmail] = useState(false);
 
   const { data, status, config } = profile;
+
+  // In-card edit states
+  const [isEditing, setIsEditing] = useState(false);
+  const [editName, setEditName] = useState(profile.config.name);
+  const [editToken, setEditToken] = useState(
+    getPrimaryToken(profile.config.cookies)
+  );
+  const [showToken, setShowToken] = useState(false);
+  const [isDeletingConfirm, setIsDeletingConfirm] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+
+  // Keep edit fields in sync if config changes
+  useEffect(() => {
+    setEditName(config.name);
+    setEditToken(getPrimaryToken(config.cookies));
+  }, [config.name, config.cookies]);
 
   useEffect(() => {
     if (!data) return;
 
     const calculateTime = () => {
       const now = Date.now();
-      const diff = data.nextFreeGemsAt - now;
+      if (data.canClaimFreeGems) {
+        setTimeLeft({ h: 0, m: 0, s: 0 });
+        setIsReady(true);
+        return;
+      }
+
+      const diff = (data.nextFreeGemsAt || 0) - now;
 
       if (diff <= 0) {
         setTimeLeft({ h: 0, m: 0, s: 0 });
@@ -43,7 +95,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({ profile, onClaim, onRe
     calculateTime();
     const interval = setInterval(calculateTime, 1000);
     return () => clearInterval(interval);
-  }, [data, data?.nextFreeGemsAt]);
+  }, [data, data?.nextFreeGemsAt, data?.canClaimFreeGems]);
 
   const isLoading = status === 'loading' || status === 'claiming';
   const isError = status === 'error';
@@ -55,12 +107,58 @@ export const AccountCard: React.FC<AccountCardProps> = ({ profile, onClaim, onRe
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const copyEmailToClipboard = (emailText: string) => {
+    if (!emailText) return;
+    navigator.clipboard.writeText(emailText);
+    setCopiedEmail(true);
+    setTimeout(() => setCopiedEmail(false), 2000);
+  };
+
+  const handleSaveEdit = async () => {
+    const trimmedName = editName.trim();
+    const trimmedToken = editToken.trim();
+
+    if (!trimmedName) {
+      setEditError("Account name cannot be empty");
+      return;
+    }
+    if (!trimmedToken) {
+      setEditError("Session token cannot be empty");
+      return;
+    }
+
+    setIsSaving(true);
+    setEditError(null);
+    try {
+      await onUpdate(profile.id, trimmedName, trimmedToken);
+      setIsEditing(false);
+      setIsDeletingConfirm(false);
+    } catch (err: any) {
+      setEditError(err.message || "Failed to update account");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSaveEdit();
+    } else if (e.key === 'Escape') {
+      setIsEditing(false);
+      setIsDeletingConfirm(false);
+      setEditName(config.name);
+      setEditToken(config.cookies["__Secure-authjs.session-token"] || Object.values(config.cookies)[0] || "");
+      setEditError(null);
+    }
+  };
+
   return (
     <Card 
       className={`
         relative overflow-hidden flex flex-col
         bg-white dark:bg-[#121214]/80 hover:bg-zinc-50 dark:hover:bg-[#18181b]/90
-        ${isReady && !isLoading ? 'border-emerald-500/50 shadow-[0_0_30px_-10px_rgba(16,185,129,0.3)]' : 'border-zinc-200 dark:border-white/5 shadow-sm dark:shadow-xl'}
+        ${isReady && !isLoading && !isEditing ? 'border-emerald-500/50 shadow-[0_0_30px_-10px_rgba(16,185,129,0.3)]' : 'border-zinc-200 dark:border-white/5 shadow-sm dark:shadow-xl'}
       `}
     >
       {/* Loading Overlay */}
@@ -74,33 +172,286 @@ export const AccountCard: React.FC<AccountCardProps> = ({ profile, onClaim, onRe
       )}
 
       {/* Header Section */}
-      <div className="p-4 border-b border-white/5 flex justify-between items-start bg-gradient-to-b from-white/[0.02] to-transparent">
-        <div className="flex items-center gap-3 overflow-hidden">
-          <div className={`
-            w-9 h-9 rounded-lg flex items-center justify-center border transition-colors
-            ${isReady ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-500' : 'bg-zinc-100 dark:bg-zinc-900 border-zinc-200 dark:border-white/10 text-zinc-400 dark:text-zinc-500'}
-          `}>
-            <User size={16} />
+      {isEditing ? (
+        <div className="p-4 border-b border-zinc-200 dark:border-white/5 flex justify-between items-center bg-gradient-to-b from-white/[0.04] to-transparent">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-500">
+              <Key size={15} />
+            </div>
+            <div>
+              <h3 className="font-bold text-xs uppercase tracking-wider text-zinc-800 dark:text-zinc-200">Edit Account</h3>
+              <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono">Update credentials</p>
+            </div>
           </div>
-          <div className="flex flex-col overflow-hidden">
-            <h3 className="font-bold text-zinc-800 dark:text-zinc-200 text-sm truncate leading-tight">{config.name}</h3>
-            <p className="text-[10px] text-zinc-500 truncate font-mono mt-0.5">
-              {data?.email || config.cookies['gmail'] || '...'}
-            </p>
+          
+          <button 
+            type="button"
+            onClick={() => {
+              setIsEditing(false);
+              setIsDeletingConfirm(false);
+              setEditName(config.name);
+              setEditToken(config.cookies["__Secure-authjs.session-token"] || Object.values(config.cookies)[0] || "");
+              setEditError(null);
+            }}
+            className="p-1.5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/5 rounded-md transition-colors"
+            title="Cancel Edit"
+          >
+            <X size={15} />
+          </button>
+        </div>
+      ) : (
+        <div className="p-4 border-b border-zinc-200 dark:border-white/5 flex justify-between items-start bg-gradient-to-b from-white/[0.02] to-transparent">
+          <div className="flex items-center gap-3 overflow-hidden min-w-0">
+            <div className={`
+              w-9 h-9 rounded-lg flex items-center justify-center border transition-colors overflow-hidden shrink-0
+              ${isReady ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-500' : 'bg-zinc-100 dark:bg-zinc-900 border-zinc-200 dark:border-white/10 text-zinc-400 dark:text-zinc-500'}
+            `}>
+              {data?.image ? (
+                <img 
+                  src={data.image} 
+                  alt={data?.name || config.name} 
+                  className="w-full h-full object-cover" 
+                  referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    (e.target as HTMLElement).style.display = 'none';
+                  }}
+                />
+              ) : (
+                <User size={16} />
+              )}
+            </div>
+            <div className="flex flex-col overflow-hidden min-w-0">
+              <h3 className="font-bold text-zinc-800 dark:text-zinc-200 text-sm truncate leading-tight" title={data?.name || config.name}>
+                {data?.name || config.name}
+              </h3>
+              <div 
+                className="flex items-center gap-1 mt-0.5 group/email cursor-pointer text-zinc-500 dark:text-zinc-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const targetEmail = data?.email || config.cookies['gmail'];
+                  if (targetEmail) copyEmailToClipboard(targetEmail);
+                }}
+                title={data?.email || config.cookies['gmail'] ? "Click to copy Gmail address" : ""}
+              >
+                <p className="text-[10px] truncate font-mono">
+                  {data?.email || config.cookies['gmail'] || '...'}
+                </p>
+                {(data?.email || config.cookies['gmail']) && (
+                  <span className="opacity-0 group-hover/email:opacity-100 transition-opacity shrink-0">
+                    {copiedEmail ? <Check size={10} className="text-emerald-500" /> : <Copy size={10} />}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-1 shrink-0">
+            <button 
+              onClick={(e) => { 
+                e.stopPropagation(); 
+                setIsEditing(true); 
+                setIsDeletingConfirm(false);
+              }}
+              className="p-1.5 text-zinc-400 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/5 rounded-md transition-colors"
+              title="Edit Account"
+            >
+              <Pencil size={13} />
+            </button>
+            <button 
+              onClick={(e) => { e.stopPropagation(); onRefresh(profile.id); }}
+              className="p-1.5 text-zinc-400 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/5 rounded-md transition-colors"
+              title="Refresh Profile"
+            >
+              <RefreshCw size={13} />
+            </button>
           </div>
         </div>
-        
-        <button 
-          onClick={(e) => { e.stopPropagation(); onRefresh(profile.id); }}
-          className="p-1.5 text-zinc-400 dark:text-zinc-600 hover:text-zinc-600 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/5 rounded-md transition-colors"
-          title="Refresh Profile"
-        >
-          <RefreshCw size={14} />
-        </button>
-      </div>
+      )}
 
       {/* Body Section */}
-      {data ? (
+      {isEditing ? (
+        <div className="flex-1 p-4 flex flex-col justify-between space-y-4 animate-in fade-in duration-200">
+          <div className="space-y-3">
+            {/* Auto-detected Google Account / Gmail Card */}
+            {(data?.email || config.cookies['gmail'] || data?.name) && (
+              <div className="p-2.5 rounded-lg bg-emerald-500/5 border border-emerald-500/15 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 overflow-hidden min-w-0">
+                  {data?.image ? (
+                    <img 
+                      src={data.image} 
+                      alt="" 
+                      className="w-6 h-6 rounded-full object-cover shrink-0" 
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <div className="w-6 h-6 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                      <Mail size={12} />
+                    </div>
+                  )}
+                  <div className="overflow-hidden min-w-0">
+                    {data?.name && (
+                      <p className="text-[11px] font-semibold text-zinc-800 dark:text-zinc-200 truncate leading-tight">
+                        {data.name}
+                      </p>
+                    )}
+                    <p className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono truncate leading-tight">
+                      {data?.email || config.cookies['gmail']}
+                    </p>
+                  </div>
+                </div>
+
+                {(data?.email || config.cookies['gmail']) && (
+                  <button
+                    type="button"
+                    onClick={() => copyEmailToClipboard(data?.email || config.cookies['gmail'])}
+                    className="p-1 text-zinc-400 hover:text-emerald-500 dark:hover:text-emerald-400 rounded transition-colors shrink-0"
+                    title="Copy Gmail"
+                  >
+                    {copiedEmail ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Account Name Field */}
+            <div>
+              <label className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1.5">
+                Account Name
+              </label>
+              <input
+                type="text"
+                value={editName}
+                onChange={(e) => {
+                  setEditName(e.target.value);
+                  if (editError) setEditError(null);
+                }}
+                onKeyDown={handleKeyDown}
+                placeholder="e.g. Account 1"
+                className="w-full px-3 py-2 text-xs bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-white/10 rounded-lg text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 transition-colors"
+                autoFocus
+              />
+            </div>
+
+            {/* Session Token Field */}
+            <div>
+              <div className="flex justify-between items-center mb-1.5">
+                <label className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                  Session Token
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowToken(!showToken)}
+                  className="text-[10px] text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 flex items-center gap-1 transition-colors"
+                >
+                  {showToken ? <><EyeOff size={11} /> Hide</> : <><Eye size={11} /> Show</>}
+                </button>
+              </div>
+              <div className="relative">
+                <input
+                  type={showToken ? "text" : "password"}
+                  value={editToken}
+                  onChange={(e) => {
+                    setEditToken(e.target.value);
+                    if (editError) setEditError(null);
+                  }}
+                  onKeyDown={handleKeyDown}
+                  placeholder="__Secure-authjs.session-token..."
+                  className="w-full px-3 py-2 pr-9 text-xs font-mono bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-white/10 rounded-lg text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 transition-colors"
+                />
+                {editToken && (
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard(editToken)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-white transition-colors"
+                    title="Copy Token"
+                  >
+                    {copied ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {editError && (
+              <div className="text-[11px] text-red-500 dark:text-red-400 flex items-center gap-1.5 bg-red-500/10 border border-red-500/20 px-2.5 py-1.5 rounded-md">
+                <AlertTriangle size={12} className="shrink-0" />
+                <span>{editError}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Action Buttons */}
+          <div className="pt-2 border-t border-zinc-100 dark:border-white/5 space-y-2">
+            {isDeletingConfirm ? (
+              <div className="p-2.5 rounded-lg bg-red-500/10 border border-red-500/20 space-y-2 animate-in fade-in duration-150">
+                <p className="text-[11px] font-semibold text-red-500 dark:text-red-400 text-center">
+                  Remove this account from dashboard?
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsDeletingConfirm(false)}
+                    className="flex-1 py-1.5 text-xs font-semibold bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onDelete(profile.id)}
+                    className="flex-1 py-1.5 text-xs font-semibold bg-red-500 hover:bg-red-600 text-white rounded transition-colors"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsDeletingConfirm(true)}
+                  className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors border border-transparent hover:border-red-500/20"
+                  title="Delete Account"
+                >
+                  <Trash2 size={14} />
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditing(false);
+                      setEditName(config.name);
+                      setEditToken(config.cookies["__Secure-authjs.session-token"] || Object.values(config.cookies)[0] || "");
+                      setEditError(null);
+                    }}
+                    className="px-3 py-1.5 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white rounded-lg hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors"
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={isSaving}
+                    onClick={handleSaveEdit}
+                    className="px-3.5 py-1.5 text-xs font-bold text-white bg-emerald-500 hover:bg-emerald-600 rounded-lg shadow-sm shadow-emerald-500/30 flex items-center gap-1.5 transition-all disabled:opacity-50"
+                  >
+                    {isSaving ? (
+                      <>
+                        <Loader2 size={12} className="animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save size={12} />
+                        Save
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : data ? (
         <div className="flex-1 p-4 flex flex-col">
           
           {/* Main Stats Row */}
