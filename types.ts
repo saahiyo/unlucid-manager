@@ -1,26 +1,43 @@
 export interface UserData {
-  date: number;
-  id: string;
-  email: string;
-  name: string;
-  matureEnabled: boolean;
+  date?: number;
+  id?: string;
+  email?: string;
+  name?: string;
+  image?: string;
+  matureEnabled?: boolean;
   gems: number;
+  totalGems?: number;
   nextFreeGemsAt: number;
-  canApplyReferral: boolean;
-  referralCode: string;
-  referralCodeUses: number;
-  referralLimit: number;
-  referralReward: number;
+  canClaimFreeGems?: boolean;
+  canApplyReferral?: boolean;
+  referralCode?: string;
+  referralCodeUses?: number;
+  referralLimit?: number;
+  referralReward?: number;
+  isAdmin?: boolean;
 }
 
 export interface AccountResponse {
   account: {
     ok: boolean;
     status: number;
-    headers: Record<string, string>;
+    headers?: Record<string, string>;
     body: {
-      user: UserData;
+      user?: Partial<UserData>;
+      totalGems?: number;
+      gems?: number;
+      matureEnabled?: boolean;
+      isAdmin?: boolean;
+      canClaimFreeGems?: boolean;
+      message?: string;
+      [key: string]: any;
     };
+  };
+  claim?: {
+    ok: boolean;
+    status: number;
+    headers?: Record<string, string>;
+    body?: any;
   };
 }
 
