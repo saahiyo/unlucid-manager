@@ -100,6 +100,14 @@ export const AccountCard: React.FC<AccountCardProps> = ({
   const isLoading = status === 'loading' || status === 'claiming';
   const isError = status === 'error';
   const isSuccess = status === 'success';
+  const isAuthError = Boolean(
+    isError && (
+      profile.message?.toLowerCase().includes('not signed in') ||
+      profile.message?.includes('401') ||
+      profile.message?.toLowerCase().includes('unauthorized') ||
+      profile.message?.toLowerCase().includes('session')
+    )
+  );
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -575,15 +583,25 @@ export const AccountCard: React.FC<AccountCardProps> = ({
                  </div>
             ) : (
                  <div className="flex flex-col items-center gap-3 animate-in fade-in zoom-in-95">
-                    <div className="p-3 bg-red-500/10 rounded-full text-red-500 border border-red-500/20 shadow-[0_0_15px_-3px_rgba(239,68,68,0.2)]">
+                    {isAuthError ? (
+                      <div className="p-3 bg-amber-500/10 rounded-full text-amber-500 border border-amber-500/20 shadow-[0_0_15px_-3px_rgba(245,158,11,0.2)]">
+                        <Key size={20} />
+                      </div>
+                    ) : (
+                      <div className="p-3 bg-red-500/10 rounded-full text-red-500 border border-red-500/20 shadow-[0_0_15px_-3px_rgba(239,68,68,0.2)]">
                         <AlertTriangle size={20} />
-                    </div>
+                      </div>
+                    )}
                     <div className="space-y-1">
-                        <span className="text-sm font-bold text-zinc-800 dark:text-zinc-300 block">Connection Failed</span>
-                        <p className="text-[10px] text-zinc-500 max-w-[180px] leading-relaxed">
-                            {isError && profile.message?.includes('CORS') 
+                        <span className="text-sm font-bold text-zinc-800 dark:text-zinc-300 block">
+                          {isAuthError ? "Session Expired" : isError && profile.message?.includes('CORS') ? "CORS Blocked" : "Connection Failed"}
+                        </span>
+                        <p className="text-[10px] text-zinc-500 max-w-[200px] leading-relaxed">
+                          {isAuthError 
+                            ? "Signed out or expired on Unlucid. Please update session token."
+                            : isError && profile.message?.includes('CORS') 
                                 ? "Cross-Origin Request Blocked." 
-                                : "Unable to reach server."}
+                                : (profile.message || "Unable to reach server.")}
                         </p>
                     </div>
                      <div className="flex items-center gap-2 mt-2">
