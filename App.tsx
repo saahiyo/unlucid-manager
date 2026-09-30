@@ -5,7 +5,7 @@ import { AccountCard } from './components/AccountCard';
 import { ThemeProvider } from './components/ThemeProvider';
 import { ThemeToggle } from './components/ThemeToggle';
 
-import { Diamond, Layers, LogOut, RefreshCw, Zap, Import, Download, Sparkles, Volume2, VolumeX, Plus } from 'lucide-react';
+import { Diamond, Layers, LogOut, RefreshCw, Zap, Import, Download, Sparkles, Volume2, VolumeX, Plus, ArrowUpDown, AlertTriangle } from 'lucide-react';
 
 import { DrawingCursor } from './components/DrawingCursor';
 import { Preloader } from './components/Preloader';
@@ -13,12 +13,23 @@ import { CookieImportModal } from './components/CookieImportModal';
 import { AddAccountModal } from './components/AddAccountModal';
 import { parseCookiesInput, getPrimaryToken, extractProfileMetadata } from './cookieUtils';
 
+type SortOption = 'valid_first' | 'gems' | 'name';
+type FilterOption = 'all' | 'valid' | 'ready' | 'offline';
+
 function App() {
   const [profiles, setProfiles] = useState<ProfileState[]>([]);
   const [globalLoading, setGlobalLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+
+  // Sorting & Filtering State (default: keep valid at start/top with shortest timer)
+  const [sortBy, setSortBy] = useState<SortOption>(() => {
+    return (localStorage.getItem('unlucid_sort_by') as SortOption) || 'valid_first';
+  });
+  const [filterBy, setFilterBy] = useState<FilterOption>(() => {
+    return (localStorage.getItem('unlucid_filter_by') as FilterOption) || 'all';
+  });
 
   // Hands-free Auto-Claimer State
   const [autoClaimEnabled, setAutoClaimEnabled] = useState(() => {
@@ -710,6 +721,77 @@ function App() {
     () => profiles.filter(p => p.data && (p.data.canClaimFreeGems || (p.data.nextFreeGemsAt && p.data.nextFreeGemsAt <= Date.now()))).length,
     [profiles]
   );
+  const validCount = useMemo(
+    () => profiles.filter(p => p.status !== 'error' && p.data !== null).length,
+    [profiles]
+  );
+  const errorCount = useMemo(
+    () => profiles.filter(p => p.status === 'error' || (!p.data && p.status !== 'loading')).length,
+    [profiles]
+  );
+
+  const sortedProfiles = useMemo(() => {
+    let list = [...profiles];
+
+    // 1. Filter
+    if (filterBy === 'valid') {
+      list = list.filter(p => p.status !== 'error' && p.data !== null);
+    } else if (filterBy === 'ready') {
+      list = list.filter(p => p.data && (p.data.canClaimFreeGems || (p.data.nextFreeGemsAt && p.data.nextFreeGemsAt <= Date.now())));
+    } else if (filterBy === 'offline') {
+      list = list.filter(p => p.status === 'error' || (!p.data && p.status !== 'loading'));
+    }
+
+    // 2. Sort
+    return list.sort((a, b) => {
+      const aIsError = a.status === 'error';
+      const bIsError = b.status === 'error';
+      const aHasData = a.data !== null;
+      const bHasData = b.data !== null;
+
+      const aIsValid = aHasData && !aIsError;
+      const bIsValid = bHasData && !bIsError;
+
+      // Primary rule: KEEP VALID AT START / TOP (unless user explicitly selected Name A-Z)
+      if (sortBy !== 'name') {
+        if (aIsValid && !bIsValid) return -1;
+        if (!aIsValid && bIsValid) return 1;
+      }
+
+      // If both are valid:
+      if (aIsValid && bIsValid && a.data && b.data) {
+        if (sortBy === 'gems') {
+          return (b.data.gems ?? 0) - (a.data.gems ?? 0);
+        }
+        if (sortBy === 'name') {
+          return a.config.name.localeCompare(b.config.name);
+        }
+
+        // Default 'valid_first' (Shortest wait timer first):
+        // 1. Ready to claim at top
+        const aReady = Boolean(a.data.canClaimFreeGems || (a.data.nextFreeGemsAt && a.data.nextFreeGemsAt <= Date.now()));
+        const bReady = Boolean(b.data.canClaimFreeGems || (b.data.nextFreeGemsAt && b.data.nextFreeGemsAt <= Date.now()));
+        if (aReady && !bReady) return -1;
+        if (!aReady && bReady) return 1;
+
+        // 2. Shortest remaining timer next (soonest to be ready)
+        const aTimer = a.data.nextFreeGemsAt || Infinity;
+        const bTimer = b.data.nextFreeGemsAt || Infinity;
+        if (aTimer !== bTimer) {
+          return aTimer - bTimer; // Shortest wait time first
+        }
+
+        // 3. Highest gems next
+        return (b.data.gems ?? 0) - (a.data.gems ?? 0);
+      }
+
+      // If both are errors/offline:
+      if (sortBy === 'name') {
+        return a.config.name.localeCompare(b.config.name);
+      }
+      return a.config.name.localeCompare(b.config.name, undefined, { numeric: true });
+    });
+  }, [profiles, sortBy, filterBy]);
 
   return (
     <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
@@ -717,7 +799,6 @@ function App() {
       {initialLoading && <Preloader onFinish={() => setInitialLoading(false)} isLoading={initialLoading} />}
       <DrawingCursor />
       
-      {/* Background Effects */}
       {/* Background Effects */}
       <div className="fixed inset-0 bg-grid-pattern z-0 opacity-40 pointer-events-none invert dark:invert-0"></div>
       <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] bg-emerald-500/5 dark:bg-emerald-900/10 blur-[120px] rounded-full z-0 pointer-events-none"></div>
@@ -756,8 +837,6 @@ function App() {
                 <div className="h-6 w-px bg-zinc-200 dark:bg-white/10 hidden sm:block"></div>
                 
                 <ThemeToggle />
-
-
             </div>
         </div>
       </header>
@@ -766,160 +845,263 @@ function App() {
       <main className="max-w-[1600px] mx-auto px-4 lg:px-6 py-8 relative z-10">
         
         {/* Toolbar */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-             <div className="flex flex-wrap items-center gap-3">
-                 <h2 className="text-lg font-bold text-zinc-900 dark:text-white flex items-center gap-2">
-                    Accounts
-                    <span className="flex items-center justify-center w-6 h-6 text-[10px] bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 rounded-full border border-zinc-200 dark:border-zinc-700">{profiles.length}</span>
-                 </h2>
+        <div className="flex flex-col gap-4 mb-6">
+          <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
+            
+            {/* Title & Filter Pills */}
+            <div className="flex flex-wrap items-center gap-3">
+              <h2 className="text-lg font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+                Accounts
+                <span className="flex items-center justify-center w-6 h-6 text-[10px] bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 rounded-full border border-zinc-200 dark:border-zinc-700">
+                  {profiles.length}
+                </span>
+              </h2>
 
-                 {autoClaimEnabled && (
-                     <div className="hidden md:flex items-center gap-2 text-[11px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full animate-in fade-in duration-300">
-                         <span className="relative flex h-2 w-2">
-                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                         </span>
-                         <span>Auto-Pilot: Scanning timers {autoClaimCount > 0 ? `(${autoClaimCount} claimed)` : ''}</span>
-                     </div>
-                 )}
-             </div>
-
-            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-                {/* Auto-Pilot Toggle */}
-                <div className="flex items-center gap-1.5">
-                    <button 
-                        onClick={toggleAutoClaim}
-                        className={`px-3.5 py-2.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 border shadow-sm ${
-                            autoClaimEnabled
-                                ? 'bg-emerald-500/10 dark:bg-emerald-950/40 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 ring-1 ring-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.15)]'
-                                : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-700'
-                        }`}
-                        title={autoClaimEnabled ? "Auto-Claim is Active (Hands-Free Monitoring)" : "Turn On Hands-Free Auto-Claim"}
-                    >
-                        <div className="relative flex items-center justify-center">
-                            <Sparkles size={14} className={autoClaimEnabled ? "text-emerald-500 animate-pulse" : "text-zinc-400"} />
-                            {autoClaimEnabled && (
-                                <span className="absolute -top-1 -right-1 flex h-2 w-2">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                                </span>
-                            )}
-                        </div>
-                        <span>Auto-Pilot: <strong className={autoClaimEnabled ? "text-emerald-600 dark:text-emerald-400 font-extrabold" : "text-zinc-500 dark:text-zinc-400 font-medium"}>{autoClaimEnabled ? "ON" : "OFF"}</strong></span>
-                    </button>
-
-                    {autoClaimEnabled && (
-                        <button
-                            onClick={() => {
-                                const next = !soundEnabled;
-                                setSoundEnabled(next);
-                                localStorage.setItem('unlucid_sound_enabled', String(next));
-                            }}
-                            className={`p-2.5 rounded-lg border text-xs transition-colors ${
-                                soundEnabled 
-                                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20' 
-                                    : 'bg-zinc-100 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-400 hover:text-zinc-600'
-                            }`}
-                            title={soundEnabled ? "Audio Chime ON (Click to Mute)" : "Audio Chime Muted (Click to Unmute)"}
-                        >
-                            {soundEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
-                        </button>
-                    )}
-                </div>
-
-                <div className="h-5 w-px bg-zinc-200 dark:bg-white/10 hidden sm:block"></div>
-
-                <button 
-                    onClick={() => setIsAddModalOpen(true)}
-                    className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm shadow-emerald-500/20 hover:shadow-emerald-500/30"
+              {/* Filter Pills */}
+              <div className="flex items-center bg-zinc-100 dark:bg-black/30 p-1 rounded-xl border border-zinc-200 dark:border-white/5 text-xs">
+                <button
+                  onClick={() => {
+                    setFilterBy('all');
+                    localStorage.setItem('unlucid_filter_by', 'all');
+                  }}
+                  className={`px-3 py-1 rounded-lg font-semibold transition-all ${
+                    filterBy === 'all'
+                      ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-sm'
+                      : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
+                  }`}
                 >
-                    <Plus size={15} />
-                    Add Account
+                  All ({profiles.length})
                 </button>
-                <button 
-                    onClick={() => setIsImportModalOpen(true)}
-                    className="px-4 py-2.5 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 text-zinc-700 dark:text-white rounded-lg text-xs font-bold transition-all flex items-center gap-2 shadow-sm dark:shadow-none"
+                <button
+                  onClick={() => {
+                    setFilterBy('valid');
+                    localStorage.setItem('unlucid_filter_by', 'valid');
+                  }}
+                  className={`px-3 py-1 rounded-lg font-semibold transition-all flex items-center gap-1.5 ${
+                    filterBy === 'valid'
+                      ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/20'
+                      : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
+                  }`}
+                  title="Show only valid & active accounts"
                 >
-                    <Import size={14} />
-                    Import
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                  Active ({validCount})
                 </button>
-                <button 
-                    onClick={handleExportCookies}
-                    disabled={profiles.length === 0}
-                    className={`px-4 py-2.5 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 text-zinc-700 dark:text-white rounded-lg text-xs font-bold transition-all flex items-center gap-2 shadow-sm dark:shadow-none ${profiles.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                    <Download size={14} />
-                    Export
-                </button>
-                {profiles.length > 0 && (
-                    <>
-                        <button 
-                            onClick={handleRefreshAll}
-                            disabled={globalLoading}
-                            className="px-4 py-2.5 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 text-zinc-700 dark:text-white rounded-lg text-xs font-bold transition-all flex items-center gap-2 shadow-sm dark:shadow-none"
-                        >
-                            <RefreshCw size={14} className={globalLoading ? "animate-spin" : ""} />
-                            Sync
-                        </button>
-                        <button 
-                            onClick={handleClaimAll}
-                            disabled={readyToClaim === 0 || globalLoading}
-                            className={`px-5 py-2.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 shadow-lg ${
-                                readyToClaim > 0 
-                                ? 'bg-emerald-500 hover:bg-emerald-600 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white shadow-emerald-500/20 dark:shadow-emerald-900/20 hover:shadow-emerald-500/40 dark:hover:shadow-emerald-900/40 hover:-translate-y-0.5' 
-                                : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-400 dark:text-zinc-600 border border-zinc-200 dark:border-zinc-800 cursor-not-allowed'
-                            }`}
-                        >
-                            {globalLoading ? <Zap className="animate-spin" size={14}/> : <Layers size={14} />}
-                            Claim All ({readyToClaim})
-                        </button>
-                    </>
+                {readyToClaim > 0 && (
+                  <button
+                    onClick={() => {
+                      setFilterBy('ready');
+                      localStorage.setItem('unlucid_filter_by', 'ready');
+                    }}
+                    className={`px-3 py-1 rounded-lg font-semibold transition-all flex items-center gap-1.5 ${
+                      filterBy === 'ready'
+                        ? 'bg-amber-500 text-white shadow-sm shadow-amber-500/20'
+                        : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
+                    }`}
+                  >
+                    <Sparkles size={11} />
+                    Ready ({readyToClaim})
+                  </button>
                 )}
+                {errorCount > 0 && (
+                  <button
+                    onClick={() => {
+                      setFilterBy('offline');
+                      localStorage.setItem('unlucid_filter_by', 'offline');
+                    }}
+                    className={`px-3 py-1 rounded-lg font-semibold transition-all flex items-center gap-1.5 ${
+                      filterBy === 'offline'
+                        ? 'bg-red-500/90 text-white shadow-sm'
+                        : 'text-zinc-400 hover:text-red-500'
+                    }`}
+                    title="Show accounts with expired tokens or connection errors"
+                  >
+                    <AlertTriangle size={11} />
+                    Offline ({errorCount})
+                  </button>
+                )}
+              </div>
+
+              {autoClaimEnabled && (
+                <div className="hidden 2xl:flex items-center gap-2 text-[11px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full animate-in fade-in duration-300">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  </span>
+                  <span>Auto-Pilot: Scanning timers {autoClaimCount > 0 ? `(${autoClaimCount} claimed)` : ''}</span>
+                </div>
+              )}
             </div>
+
+            {/* Right Controls: Sort & Action Buttons */}
+            <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto">
+              {/* Sort Selector */}
+              <div className="flex items-center gap-1.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-2.5 py-2 text-xs text-zinc-600 dark:text-zinc-300 shadow-sm dark:shadow-none">
+                <ArrowUpDown size={13} className="text-zinc-400 shrink-0" />
+                <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider hidden sm:inline">Sort:</span>
+                <select
+                  value={sortBy}
+                  onChange={(e) => {
+                    const val = e.target.value as SortOption;
+                    setSortBy(val);
+                    localStorage.setItem('unlucid_sort_by', val);
+                  }}
+                  className="bg-transparent border-none text-xs font-semibold text-zinc-800 dark:text-zinc-200 focus:outline-none cursor-pointer pr-1"
+                >
+                  <option value="valid_first" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white">Valid at Top (Shortest Timer)</option>
+                  <option value="gems" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white">Highest Gems</option>
+                  <option value="name" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white">Name (A - Z)</option>
+                </select>
+              </div>
+
+              {/* Auto-Pilot Toggle */}
+              <div className="flex items-center gap-1.5">
+                <button 
+                  onClick={toggleAutoClaim}
+                  className={`px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 border shadow-sm ${
+                    autoClaimEnabled
+                      ? 'bg-emerald-500/10 dark:bg-emerald-950/40 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 ring-1 ring-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.15)]'
+                      : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-700'
+                  }`}
+                  title={autoClaimEnabled ? "Auto-Claim is Active (Hands-Free Monitoring)" : "Turn On Hands-Free Auto-Claim"}
+                >
+                  <div className="relative flex items-center justify-center">
+                    <Sparkles size={13} className={autoClaimEnabled ? "text-emerald-500 animate-pulse" : "text-zinc-400"} />
+                    {autoClaimEnabled && (
+                      <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                      </span>
+                    )}
+                  </div>
+                  <span>Auto-Pilot: <strong className={autoClaimEnabled ? "text-emerald-600 dark:text-emerald-400 font-extrabold" : "text-zinc-500 dark:text-zinc-400 font-medium"}>{autoClaimEnabled ? "ON" : "OFF"}</strong></span>
+                </button>
+
+                {autoClaimEnabled && (
+                  <button
+                    onClick={() => {
+                      const next = !soundEnabled;
+                      setSoundEnabled(next);
+                      localStorage.setItem('unlucid_sound_enabled', String(next));
+                    }}
+                    className={`p-2 rounded-lg border text-xs transition-colors ${
+                      soundEnabled 
+                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20' 
+                        : 'bg-zinc-100 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-400 hover:text-zinc-600'
+                    }`}
+                    title={soundEnabled ? "Audio Chime ON (Click to Mute)" : "Audio Chime Muted (Click to Unmute)"}
+                  >
+                    {soundEnabled ? <Volume2 size={13} /> : <VolumeX size={13} />}
+                  </button>
+                )}
+              </div>
+
+              <div className="h-5 w-px bg-zinc-200 dark:bg-white/10 hidden sm:block"></div>
+
+              <button 
+                onClick={() => setIsAddModalOpen(true)}
+                className="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm shadow-emerald-500/20 hover:shadow-emerald-500/30"
+              >
+                <Plus size={14} />
+                Add Account
+              </button>
+              <button 
+                onClick={() => setIsImportModalOpen(true)}
+                className="px-3 py-2 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 text-zinc-700 dark:text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm dark:shadow-none"
+              >
+                <Import size={13} />
+                Import
+              </button>
+              <button 
+                onClick={handleExportCookies}
+                disabled={profiles.length === 0}
+                className={`px-3 py-2 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 text-zinc-700 dark:text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm dark:shadow-none ${profiles.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                <Download size={13} />
+                Export
+              </button>
+              {profiles.length > 0 && (
+                <>
+                  <button 
+                    onClick={handleRefreshAll}
+                    disabled={globalLoading}
+                    className="px-3 py-2 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 text-zinc-700 dark:text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm dark:shadow-none"
+                  >
+                    <RefreshCw size={13} className={globalLoading ? "animate-spin" : ""} />
+                    Sync
+                  </button>
+                  <button 
+                    onClick={handleClaimAll}
+                    disabled={readyToClaim === 0 || globalLoading}
+                    className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-md ${
+                      readyToClaim > 0 
+                        ? 'bg-emerald-500 hover:bg-emerald-600 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white shadow-emerald-500/20 dark:shadow-emerald-900/20' 
+                        : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-400 dark:text-zinc-600 border border-zinc-200 dark:border-zinc-800 cursor-not-allowed'
+                    }`}
+                  >
+                    {globalLoading ? <Zap className="animate-spin" size={13}/> : <Layers size={13} />}
+                    Claim All ({readyToClaim})
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Grid */}
         {profiles.length === 0 ? (
-             <div className="border border-dashed border-zinc-300 dark:border-zinc-800 rounded-3xl p-16 text-center bg-white/50 dark:bg-black/20 backdrop-blur-sm">
-                <div className="w-20 h-20 bg-zinc-100 dark:bg-zinc-900/80 rounded-3xl flex items-center justify-center mx-auto mb-6 text-zinc-400 dark:text-zinc-700 shadow-inner border border-zinc-200 dark:border-white/5">
-                    <LogOut size={32} />
-                </div>
-                <h3 className="text-xl font-bold text-zinc-900 dark:text-white mb-2">No accounts active</h3>
-                <p className="text-zinc-500 max-w-sm mx-auto mb-8 text-sm leading-relaxed">
-                    Get started by importing your session cookies. <br/>
-                    <span className="text-xs text-zinc-600 mt-2 block">Use the extension to export your profiles or add them manually.</span>
-                </p>
-                <div className="flex flex-wrap items-center justify-center gap-3">
-                    <button 
-                        onClick={() => setIsAddModalOpen(true)}
-                        className="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40 transition-all flex items-center gap-2"
-                    >
-                        <Plus size={16} />
-                        Add Account
-                    </button>
-                    <button 
-                        onClick={() => setIsImportModalOpen(true)}
-                        className="px-6 py-3 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-800 dark:text-white rounded-xl text-sm font-bold transition-all flex items-center gap-2"
-                    >
-                        <Import size={16} />
-                        Import Cookies
-                    </button>
-                </div>
-
-             </div>
-        ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5 items-start">
-                {profiles.map(profile => (
-                    <AccountCard 
-                        key={profile.id} 
-                        profile={profile} 
-                        onClaim={claimGems}
-                        onRefresh={() => fetchAccountData(profile.id)}
-                        onUpdate={handleUpdateAccount}
-                        onDelete={handleDeleteAccount}
-                    />
-                ))}
+          <div className="border border-dashed border-zinc-300 dark:border-zinc-800 rounded-3xl p-16 text-center bg-white/50 dark:bg-black/20 backdrop-blur-sm">
+            <div className="w-20 h-20 bg-zinc-100 dark:bg-zinc-900/80 rounded-3xl flex items-center justify-center mx-auto mb-6 text-zinc-400 dark:text-zinc-700 shadow-inner border border-zinc-200 dark:border-white/5">
+              <LogOut size={32} />
             </div>
+            <h3 className="text-xl font-bold text-zinc-900 dark:text-white mb-2">No accounts active</h3>
+            <p className="text-zinc-500 max-w-sm mx-auto mb-8 text-sm leading-relaxed">
+              Get started by importing your session cookies. <br/>
+              <span className="text-xs text-zinc-600 mt-2 block">Use the extension to export your profiles or add them manually.</span>
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <button 
+                onClick={() => setIsAddModalOpen(true)}
+                className="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40 transition-all flex items-center gap-2"
+              >
+                <Plus size={16} />
+                Add Account
+              </button>
+              <button 
+                onClick={() => setIsImportModalOpen(true)}
+                className="px-6 py-3 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-800 dark:text-white rounded-xl text-sm font-bold transition-all flex items-center gap-2"
+              >
+                <Import size={16} />
+                Import Cookies
+              </button>
+            </div>
+          </div>
+        ) : sortedProfiles.length === 0 ? (
+          <div className="border border-dashed border-zinc-300 dark:border-zinc-800 rounded-3xl p-12 text-center bg-white/50 dark:bg-black/20 backdrop-blur-sm">
+            <p className="text-zinc-500 text-sm mb-3">No {filterBy} accounts found.</p>
+            <button
+              onClick={() => {
+                setFilterBy('all');
+                localStorage.setItem('unlucid_filter_by', 'all');
+              }}
+              className="px-4 py-2 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-800 dark:text-white rounded-lg text-xs font-semibold transition-all"
+            >
+              Show All Accounts
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5 items-start">
+            {sortedProfiles.map(profile => (
+              <AccountCard 
+                key={profile.id} 
+                profile={profile} 
+                onClaim={claimGems}
+                onRefresh={() => fetchAccountData(profile.id)}
+                onUpdate={handleUpdateAccount}
+                onDelete={handleDeleteAccount}
+              />
+            ))}
+          </div>
         )}
       </main>
 

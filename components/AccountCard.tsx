@@ -586,13 +586,25 @@ export const AccountCard: React.FC<AccountCardProps> = ({
                                 : "Unable to reach server."}
                         </p>
                     </div>
-                    <button 
-                        onClick={(e) => { e.stopPropagation(); onRefresh(profile.id); }}
-                        className="mt-2 text-[10px] bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300 px-4 py-2 rounded border border-zinc-200 dark:border-zinc-700 transition-all hover:border-zinc-300 dark:hover:border-zinc-500"
-                    >
-                        Try Again
-                    </button>
-                </div>
+                     <div className="flex items-center gap-2 mt-2">
+                       <button 
+                           onClick={(e) => { e.stopPropagation(); onRefresh(profile.id); }}
+                           className="text-[10px] font-semibold bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 transition-all hover:border-zinc-300 dark:hover:border-zinc-500"
+                       >
+                           Try Again
+                       </button>
+                       <button 
+                           onClick={(e) => { 
+                             e.stopPropagation(); 
+                             setIsEditing(true); 
+                             setIsDeletingConfirm(false);
+                           }}
+                           className="text-[10px] font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 px-3 py-1.5 rounded-lg border border-emerald-500/20 transition-all hover:border-emerald-500/40"
+                       >
+                           Update Token
+                       </button>
+                     </div>
+                 </div>
             )}
         </div>
       )}
