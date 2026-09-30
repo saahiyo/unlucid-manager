@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Plus, Trash2, Save, Import, FileJson } from 'lucide-react';
+import { getPrimaryToken } from '../cookieUtils';
 
 interface CookieImportModalProps {
   isOpen: boolean;
@@ -61,12 +62,15 @@ export function CookieImportModal({ isOpen, onClose, onSave, initialData = [] }:
         const newAccounts: { name: string; token: string; id: string }[] = [];
         
         Object.entries(parsed).forEach(([name, cookies]: [string, any], index) => {
-            if (cookies && cookies["__Secure-authjs.session-token"]) {
-                newAccounts.push({
-                    name: name,
-                    token: cookies["__Secure-authjs.session-token"],
-                    id: `imported-${Date.now()}-${index}`
-                });
+            if (cookies) {
+                const tokenStr = typeof cookies === 'string' ? cookies : getPrimaryToken(cookies);
+                if (tokenStr) {
+                    newAccounts.push({
+                        name: name,
+                        token: tokenStr,
+                        id: `imported-${Date.now()}-${index}`
+                    });
+                }
             }
         });
 
