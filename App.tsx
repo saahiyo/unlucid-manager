@@ -480,7 +480,8 @@ function App() {
 
       const body = result.account.body || {};
       const userObj = body.user || body;
-      const totalGems = userObj.totalGems ?? userObj.gems ?? 0;
+      // Safely preserve balance from whichever field is non-zero
+      const totalGems = (userObj.gems && userObj.gems > 0 ? userObj.gems : userObj.totalGems) ?? userObj.gems ?? userObj.totalGems ?? 0;
 
       // Extract accurate claim timing from Unlucid's SvelteKit /gems data
       const extractedClaim = extractClaimData(
@@ -490,9 +491,22 @@ function App() {
         result
       );
 
+      // Check stored custom/persisted timer if available
+      let storedTimer: number | null = null;
+      try {
+        const timersStr = localStorage.getItem('unlucid_account_timers');
+        if (timersStr) {
+          const timersMap = JSON.parse(timersStr);
+          if (timersMap[id] && timersMap[id] > Date.now()) {
+            storedTimer = timersMap[id];
+          }
+        }
+      } catch (e) {}
+
       const canClaim = extractedClaim.canClaimFreeGems ?? Boolean(userObj.canClaimFreeGems);
       const nextFreeGemsAt = extractedClaim.nextFreeGemsAt
         || userObj.nextFreeGemsAt
+        || storedTimer
         || (canClaim ? Date.now() : Date.now() + 24 * 3600000);
 
       // Extract user metadata (real Google display name, Gmail address, Google avatar)
@@ -682,6 +696,14 @@ function App() {
           setProfiles(prev => prev.map(p => p.id === id ? { ...p, message: undefined } : p));
       }, 4000);
 
+      // Record 24h timer on successful claim
+      try {
+        const timersStr = localStorage.getItem('unlucid_account_timers');
+        const timersMap = timersStr ? JSON.parse(timersStr) : {};
+        timersMap[id] = Date.now() + 24 * 3600000;
+        localStorage.setItem('unlucid_account_timers', JSON.stringify(timersMap));
+      } catch (e) {}
+
       return true;
 
     } catch (err) {
@@ -689,6 +711,27 @@ function App() {
       setProfiles(prev => prev.map(p => p.id === id ? { ...p, status: 'error', message: errorMsg } : p));
       return false;
     }
+  };
+
+  const handleSetTimer = (id: string, nextFreeGemsAt: number) => {
+    setProfiles(prev => prev.map(p => {
+      if (p.id !== id || !p.data) return p;
+      return {
+        ...p,
+        data: {
+          ...p.data,
+          nextFreeGemsAt,
+          canClaimFreeGems: nextFreeGemsAt <= Date.now()
+        }
+      };
+    }));
+
+    try {
+      const timersStr = localStorage.getItem('unlucid_account_timers');
+      const timersMap = timersStr ? JSON.parse(timersStr) : {};
+      timersMap[id] = nextFreeGemsAt;
+      localStorage.setItem('unlucid_account_timers', JSON.stringify(timersMap));
+    } catch (e) {}
   };
 
   // Hands-free Auto-Claimer Interval Loop
@@ -1180,6 +1223,7 @@ function App() {
                     onRefresh={() => fetchAccountData(profile.id)}
                     onUpdate={handleUpdateAccount}
                     onDelete={handleDeleteAccount}
+                    onSetTimer={handleSetTimer}
                     isDragEnabled={sortBy === 'custom'}
                   />
                 ))}

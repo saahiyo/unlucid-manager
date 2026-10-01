@@ -11,6 +11,7 @@ interface SortableAccountCardProps {
   onRefresh: (id: string) => void;
   onUpdate: (id: string, newName: string, newToken: string) => Promise<void> | void;
   onDelete: (id: string) => void;
+  onSetTimer?: (id: string, nextFreeGemsAt: number) => void;
   isDragEnabled: boolean;
 }
 
@@ -20,6 +21,7 @@ export const SortableAccountCard: React.FC<SortableAccountCardProps> = ({
   onRefresh,
   onUpdate,
   onDelete,
+  onSetTimer,
   isDragEnabled
 }) => {
   const {
@@ -67,6 +69,7 @@ export const SortableAccountCard: React.FC<SortableAccountCardProps> = ({
         onRefresh={onRefresh}
         onUpdate={onUpdate}
         onDelete={onDelete}
+        onSetTimer={onSetTimer}
       />
     </div>
   );

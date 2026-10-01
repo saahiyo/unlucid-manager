@@ -31,6 +31,7 @@ interface AccountCardProps {
   onRefresh: (id: string) => void;
   onUpdate: (id: string, newName: string, newToken: string) => Promise<void> | void;
   onDelete: (id: string) => void;
+  onSetTimer?: (id: string, nextFreeGemsAt: number) => void;
 }
 
 export const AccountCard: React.FC<AccountCardProps> = ({ 
@@ -38,7 +39,8 @@ export const AccountCard: React.FC<AccountCardProps> = ({
   onClaim, 
   onRefresh,
   onUpdate,
-  onDelete
+  onDelete,
+  onSetTimer
 }) => {
   const [timeLeft, setTimeLeft] = useState<{ h: number; m: number; s: number } | null>(null);
   const [isReady, setIsReady] = useState(false);
@@ -58,6 +60,47 @@ export const AccountCard: React.FC<AccountCardProps> = ({
   const [isDeletingConfirm, setIsDeletingConfirm] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+
+  // Quick Timer adjustment state
+  const [isEditingTimer, setIsEditingTimer] = useState(false);
+  const [customTimerInput, setCustomTimerInput] = useState('');
+
+  const handleSaveCustomTimer = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const input = customTimerInput.trim().toLowerCase();
+    if (!input) {
+      setIsEditingTimer(false);
+      return;
+    }
+
+    let totalMs = 0;
+    const colonParts = input.split(':');
+    if (colonParts.length === 2 || colonParts.length === 3) {
+      const h = parseInt(colonParts[0], 10) || 0;
+      const m = parseInt(colonParts[1], 10) || 0;
+      const s = parseInt(colonParts[2] || '0', 10) || 0;
+      totalMs = (h * 3600 + m * 60 + s) * 1000;
+    } else {
+      const hMatch = input.match(/(\d+)\s*h/);
+      const mMatch = input.match(/(\d+)\s*m/);
+      const sMatch = input.match(/(\d+)\s*s/);
+      if (hMatch) totalMs += parseInt(hMatch[1], 10) * 3600 * 1000;
+      if (mMatch) totalMs += parseInt(mMatch[1], 10) * 60 * 1000;
+      if (sMatch) totalMs += parseInt(sMatch[1], 10) * 1000;
+
+      if (totalMs === 0) {
+        const num = parseFloat(input);
+        if (!isNaN(num) && num > 0) totalMs = Math.round(num * 3600 * 1000);
+      }
+    }
+
+    if (totalMs > 0 && onSetTimer) {
+      const newNext = Date.now() + totalMs;
+      onSetTimer(profile.id, newNext);
+    }
+    setIsEditingTimer(false);
+    setCustomTimerInput('');
+  };
 
   // Keep edit fields in sync if config changes
   useEffect(() => {
@@ -476,30 +519,78 @@ export const AccountCard: React.FC<AccountCardProps> = ({
 
             {/* Timer */}
             <div className={`rounded-lg p-3 border relative group transition-colors ${isReady ? 'bg-emerald-500/5 dark:bg-emerald-900/10 border-emerald-500/20' : 'bg-zinc-50 dark:bg-black/40 border-zinc-200 dark:border-white/5'}`}>
-               <div className="text-[9px] font-bold uppercase tracking-wider mb-1 flex items-center gap-1 transition-colors">
+              <div className="text-[9px] font-bold uppercase tracking-wider mb-1 flex items-center justify-between transition-colors">
                 {isReady ? (
-                     <span className="text-emerald-500 flex items-center gap-1">
-                         <Sparkles size={10} /> Ready
-                     </span>
+                  <span className="text-emerald-500 flex items-center gap-1">
+                    <Sparkles size={10} /> Ready
+                  </span>
                 ) : (
-                    <span className="text-zinc-500 flex items-center gap-1">
-                        <Clock size={10} /> Next
-                    </span>
+                  <span className="text-zinc-500 flex items-center gap-1">
+                    <Clock size={10} /> Next
+                  </span>
                 )}
+                {/* Adjust Timer button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsEditingTimer(!isEditingTimer);
+                    setCustomTimerInput(timeLeft ? `${timeLeft.h}h ${timeLeft.m}m` : '');
+                  }}
+                  className="opacity-0 group-hover:opacity-100 hover:text-emerald-500 text-zinc-400 dark:text-zinc-500 transition-all p-0.5 rounded"
+                  title="Adjust claim timer (e.g. 9h 50m)"
+                >
+                  <Pencil size={10} />
+                </button>
               </div>
-              <div className={`text-xl font-mono font-bold transition-colors ${isReady ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-400'}`}>
-                {isReady ? 'Now' : (
-                  timeLeft ? (
-                    <div className="flex items-center">
-                      <SlidingNumber value={timeLeft.h} padStart />
-                      <span className="mx-[1px]">:</span>
-                      <SlidingNumber value={timeLeft.m} padStart />
-                      <span className="mx-[1px]" >:</span>
-                      <SlidingNumber value={timeLeft.s} padStart />
-                    </div>
-                  ) : '--:--:--'
-                )}
-              </div>
+
+              {isEditingTimer ? (
+                <form onSubmit={handleSaveCustomTimer} className="pt-0.5 space-y-1">
+                  <input
+                    type="text"
+                    value={customTimerInput}
+                    onChange={(e) => setCustomTimerInput(e.target.value)}
+                    placeholder="9h 50m or 9:50"
+                    autoFocus
+                    className="w-full text-xs font-mono bg-white dark:bg-zinc-900 border border-emerald-500/50 rounded px-1.5 py-1 text-zinc-800 dark:text-white focus:outline-none"
+                  />
+                  <div className="flex gap-1 justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingTimer(false)}
+                      className="text-[9px] px-1.5 py-0.5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="text-[9px] px-2 py-0.5 bg-emerald-500 text-white font-bold rounded hover:bg-emerald-600"
+                    >
+                      Save
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <div 
+                  onClick={() => {
+                    setIsEditingTimer(true);
+                    setCustomTimerInput(timeLeft ? `${timeLeft.h}h ${timeLeft.m}m` : '');
+                  }}
+                  className={`text-xl font-mono font-bold transition-colors cursor-pointer select-none ${isReady ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-400'}`}
+                  title="Click to adjust timer"
+                >
+                  {isReady ? 'Now' : (
+                    timeLeft ? (
+                      <div className="flex items-center">
+                        <SlidingNumber value={timeLeft.h} padStart />
+                        <span className="mx-[1px]">:</span>
+                        <SlidingNumber value={timeLeft.m} padStart />
+                        <span className="mx-[1px]" >:</span>
+                        <SlidingNumber value={timeLeft.s} padStart />
+                      </div>
+                    ) : '--:--:--'
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
