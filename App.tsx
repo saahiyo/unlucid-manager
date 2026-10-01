@@ -1,19 +1,34 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { ProfileState, RawCookiesJson } from './types';
 import { URL_ACCOUNT, URL_CLAIM, URL_BOTH } from './config';
-import { AccountCard } from './components/AccountCard';
 import { ThemeProvider } from './components/ThemeProvider';
 import { ThemeToggle } from './components/ThemeToggle';
 
-import { Diamond, Layers, LogOut, RefreshCw, Zap, Import, Download, Sparkles, Volume2, VolumeX, Plus, ArrowUpDown, AlertTriangle } from 'lucide-react';
+import { Diamond, Layers, LogOut, RefreshCw, Zap, Import, Download, Sparkles, Volume2, VolumeX, Plus, ArrowUpDown, AlertTriangle, GripVertical } from 'lucide-react';
 
 import { DrawingCursor } from './components/DrawingCursor';
 import { Preloader } from './components/Preloader';
 import { CookieImportModal } from './components/CookieImportModal';
 import { AddAccountModal } from './components/AddAccountModal';
+import { SortableAccountCard } from './components/SortableAccountCard';
 import { parseCookiesInput, getPrimaryToken, extractProfileMetadata } from './cookieUtils';
 
-type SortOption = 'valid_first' | 'gems' | 'name';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  rectSortingStrategy,
+  arrayMove,
+} from '@dnd-kit/sortable';
+
+type SortOption = 'valid_first' | 'gems' | 'name' | 'custom';
 type FilterOption = 'all' | 'valid' | 'ready' | 'offline';
 
 function App() {
@@ -30,6 +45,20 @@ function App() {
   const [filterBy, setFilterBy] = useState<FilterOption>(() => {
     return (localStorage.getItem('unlucid_filter_by') as FilterOption) || 'all';
   });
+
+  // Custom drag order (array of profile IDs in user-defined order)
+  const [customOrder, setCustomOrder] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem('unlucid_custom_order');
+      return stored ? JSON.parse(stored) : [];
+    } catch { return []; }
+  });
+
+  // DnD sensors with activation distance to prevent accidental drags
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor)
+  );
 
   // Hands-free Auto-Claimer State
   const [autoClaimEnabled, setAutoClaimEnabled] = useState(() => {
@@ -743,6 +772,16 @@ function App() {
     }
 
     // 2. Sort
+    if (sortBy === 'custom' && customOrder.length > 0) {
+      // Use saved custom order — items not in order go to end
+      const orderMap = new Map<string, number>(customOrder.map((id, idx) => [id, idx]));
+      return list.sort((a, b) => {
+        const aIdx = orderMap.has(a.id) ? (orderMap.get(a.id) as number) : 999999;
+        const bIdx = orderMap.has(b.id) ? (orderMap.get(b.id) as number) : 999999;
+        return aIdx - bIdx;
+      });
+    }
+
     return list.sort((a, b) => {
       const aIsError = a.status === 'error';
       const bIsError = b.status === 'error';
@@ -791,7 +830,28 @@ function App() {
       }
       return a.config.name.localeCompare(b.config.name, undefined, { numeric: true });
     });
-  }, [profiles, sortBy, filterBy]);
+  }, [profiles, sortBy, filterBy, customOrder]);
+
+  // Handle drag end — reorder and auto-switch to Custom sort
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const currentIds = sortedProfiles.map(p => p.id);
+    const oldIndex = currentIds.indexOf(active.id as string);
+    const newIndex = currentIds.indexOf(over.id as string);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const newOrder = arrayMove(currentIds, oldIndex, newIndex);
+    setCustomOrder(newOrder);
+    localStorage.setItem('unlucid_custom_order', JSON.stringify(newOrder));
+
+    // Auto-switch to custom sort
+    if (sortBy !== 'custom') {
+      setSortBy('custom');
+      localStorage.setItem('unlucid_sort_by', 'custom');
+    }
+  }, [sortedProfiles, sortBy]);
 
   return (
     <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
@@ -951,6 +1011,7 @@ function App() {
                   <option value="valid_first" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white">Valid at Top (Shortest Timer)</option>
                   <option value="gems" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white">Highest Gems</option>
                   <option value="name" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white">Name (A - Z)</option>
+                  <option value="custom" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white">Custom (Drag)</option>
                 </select>
               </div>
 
@@ -1090,18 +1151,30 @@ function App() {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5 items-start">
-            {sortedProfiles.map(profile => (
-              <AccountCard 
-                key={profile.id} 
-                profile={profile} 
-                onClaim={claimGems}
-                onRefresh={() => fetchAccountData(profile.id)}
-                onUpdate={handleUpdateAccount}
-                onDelete={handleDeleteAccount}
-              />
-            ))}
-          </div>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={sortedProfiles.map(p => p.id)}
+              strategy={rectSortingStrategy}
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5 items-start">
+                {sortedProfiles.map(profile => (
+                  <SortableAccountCard
+                    key={profile.id} 
+                    profile={profile} 
+                    onClaim={claimGems}
+                    onRefresh={() => fetchAccountData(profile.id)}
+                    onUpdate={handleUpdateAccount}
+                    onDelete={handleDeleteAccount}
+                    isDragEnabled={sortBy === 'custom'}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
         )}
       </main>
 
