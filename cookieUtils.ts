@@ -221,3 +221,118 @@ export function extractProfileMetadata(payload: any): ExtractedProfile {
   return profile;
 }
 
+export interface ExtractedClaimData {
+  canClaimFreeGems?: boolean;
+  remainingMs?: number;
+  nextFreeGemsAt?: number;
+  dailyGemsAmount?: number;
+}
+
+/**
+ * Hydrates and unflattens SvelteKit devalue arrays into native JS objects/arrays.
+ */
+export function unflattenSvelteKit(data: any): any {
+  if (!Array.isArray(data)) return data;
+  const memo = new Map<number, any>();
+
+  function hydrate(index: number): any {
+    if (memo.has(index)) return memo.get(index);
+    const val = data[index];
+    if (val === null || val === undefined || typeof val !== 'object') return val;
+
+    if (Array.isArray(val)) {
+      const arr: any[] = [];
+      memo.set(index, arr);
+      for (const idx of val) {
+        arr.push(typeof idx === 'number' && idx < data.length ? hydrate(idx) : idx);
+      }
+      return arr;
+    }
+
+    const res: Record<string, any> = {};
+    memo.set(index, res);
+    for (const [k, v] of Object.entries(val)) {
+      res[k] = typeof v === 'number' && v < data.length ? hydrate(v) : v;
+    }
+    return res;
+  }
+
+  return hydrate(0);
+}
+
+/**
+ * Extracts claim timing and eligibility data from Unlucid API and SvelteKit responses.
+ */
+export function extractClaimData(payload: any): ExtractedClaimData {
+  if (!payload) return {};
+  const result: ExtractedClaimData = {};
+
+  function scanObj(obj: any) {
+    if (!obj || typeof obj !== 'object') return;
+
+    if (typeof obj.remainingMs === 'number') {
+      result.remainingMs = obj.remainingMs;
+      result.nextFreeGemsAt = Date.now() + obj.remainingMs;
+    }
+    if (typeof obj.nextFreeGemsAt === 'number') {
+      result.nextFreeGemsAt = obj.nextFreeGemsAt;
+    }
+    if (typeof obj.canClaim === 'boolean') {
+      result.canClaimFreeGems = obj.canClaim;
+    }
+    if (typeof obj.canClaimFreeGems === 'boolean') {
+      result.canClaimFreeGems = obj.canClaimFreeGems;
+    }
+    if (typeof obj.amount === 'number' && obj.amount > 0 && !result.dailyGemsAmount) {
+      result.dailyGemsAmount = obj.amount;
+    }
+
+    if (obj.dailyFreeGems && typeof obj.dailyFreeGems === 'object') {
+      scanObj(obj.dailyFreeGems);
+    }
+    if (obj.claim && typeof obj.claim === 'object') {
+      scanObj(obj.claim);
+    }
+  }
+
+  // 1. Scan direct payload
+  scanObj(payload);
+  if (payload.account?.body) scanObj(payload.account.body);
+  if (payload.claim?.body) scanObj(payload.claim.body);
+  if (payload.body) scanObj(payload.body);
+
+  // 2. Scan svelteData nodes
+  const svelteData = 
+    payload.svelteData || 
+    payload.account?.body?.svelteData || 
+    payload.body?.svelteData;
+
+  if (svelteData && svelteData.nodes && Array.isArray(svelteData.nodes)) {
+    for (const node of svelteData.nodes) {
+      if (node && Array.isArray(node.data)) {
+        try {
+          const unflat = unflattenSvelteKit(node.data);
+          scanObj(unflat);
+        } catch (e) {}
+      }
+    }
+  }
+
+  // 3. Fallback: direct scan of raw devalue arrays if present
+  if (Array.isArray(svelteData)) {
+    try {
+      scanObj(unflattenSvelteKit(svelteData));
+    } catch (e) {}
+  }
+
+  // If canClaim is true or remainingMs <= 0, mark as claimable immediately
+  if (result.canClaimFreeGems || (typeof result.remainingMs === 'number' && result.remainingMs <= 0)) {
+    result.canClaimFreeGems = true;
+    result.nextFreeGemsAt = Date.now();
+    result.remainingMs = 0;
+  }
+
+  return result;
+}
+
+

@@ -11,7 +11,7 @@ import { Preloader } from './components/Preloader';
 import { CookieImportModal } from './components/CookieImportModal';
 import { AddAccountModal } from './components/AddAccountModal';
 import { SortableAccountCard } from './components/SortableAccountCard';
-import { parseCookiesInput, getPrimaryToken, extractProfileMetadata } from './cookieUtils';
+import { parseCookiesInput, getPrimaryToken, extractProfileMetadata, extractClaimData } from './cookieUtils';
 
 import {
   DndContext,
@@ -481,8 +481,19 @@ function App() {
       const body = result.account.body || {};
       const userObj = body.user || body;
       const totalGems = userObj.totalGems ?? userObj.gems ?? 0;
-      const canClaim = Boolean(userObj.canClaimFreeGems);
-      const nextFreeGemsAt = userObj.nextFreeGemsAt || (canClaim ? Date.now() : Date.now() + 3600000);
+
+      // Extract accurate claim timing from Unlucid's SvelteKit /gems data
+      const extractedClaim = extractClaimData(
+        result.account?.body?.svelteData ||
+        result.account?.body ||
+        result.claim?.body ||
+        result
+      );
+
+      const canClaim = extractedClaim.canClaimFreeGems ?? Boolean(userObj.canClaimFreeGems);
+      const nextFreeGemsAt = extractedClaim.nextFreeGemsAt
+        || userObj.nextFreeGemsAt
+        || (canClaim ? Date.now() : Date.now() + 24 * 3600000);
 
       // Extract user metadata (real Google display name, Gmail address, Google avatar)
       const extractedMeta = extractProfileMetadata(
