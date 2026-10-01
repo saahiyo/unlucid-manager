@@ -479,11 +479,17 @@ function App() {
       }
 
       const body = result.account.body || {};
-      const userObj = body.user || body;
-      // Safely preserve balance from whichever field is non-zero
-      const totalGems = (userObj.gems && userObj.gems > 0 ? userObj.gems : userObj.totalGems) ?? userObj.gems ?? userObj.totalGems ?? 0;
+      const userObj = body.user || {};
 
-      // Extract accurate claim timing from Unlucid's SvelteKit /gems data
+      // 1. Safely resolve Gems balance from top-level body or nested userObj
+      const totalGems = 
+        (typeof body.gems === 'number' ? body.gems : null) ??
+        (typeof body.totalGems === 'number' ? body.totalGems : null) ??
+        (typeof userObj.gems === 'number' ? userObj.gems : null) ??
+        (typeof userObj.totalGems === 'number' ? userObj.totalGems : null) ??
+        0;
+
+      // 2. Extract accurate claim timing from Unlucid's SvelteKit /gems data
       const extractedClaim = extractClaimData(
         result.account?.body?.svelteData ||
         result.account?.body ||
@@ -491,7 +497,7 @@ function App() {
         result
       );
 
-      // Check stored custom/persisted timer if available
+      // 3. Check stored custom/persisted timer if available
       let storedTimer: number | null = null;
       try {
         const timersStr = localStorage.getItem('unlucid_account_timers');
@@ -503,11 +509,20 @@ function App() {
         }
       } catch (e) {}
 
-      const canClaim = extractedClaim.canClaimFreeGems ?? Boolean(userObj.canClaimFreeGems);
-      const nextFreeGemsAt = extractedClaim.nextFreeGemsAt
-        || userObj.nextFreeGemsAt
-        || storedTimer
-        || (canClaim ? Date.now() : Date.now() + 24 * 3600000);
+      // 4. Resolve claim readiness
+      const canClaim = 
+        extractedClaim.canClaimFreeGems ??
+        (typeof body.canClaimFreeGems === 'boolean' ? body.canClaimFreeGems : null) ??
+        (typeof userObj.canClaimFreeGems === 'boolean' ? userObj.canClaimFreeGems : null) ??
+        false;
+
+      // 5. Resolve claim timer
+      const nextFreeGemsAt = 
+        extractedClaim.nextFreeGemsAt ??
+        (typeof body.nextFreeGemsAt === 'number' && body.nextFreeGemsAt > Date.now() ? body.nextFreeGemsAt : null) ??
+        (typeof userObj.nextFreeGemsAt === 'number' && userObj.nextFreeGemsAt > Date.now() ? userObj.nextFreeGemsAt : null) ??
+        storedTimer ??
+        (canClaim ? Date.now() : Date.now() + 24 * 3600000);
 
       // Extract user metadata (real Google display name, Gmail address, Google avatar)
       const extractedMeta = extractProfileMetadata(
@@ -516,8 +531,8 @@ function App() {
         result.claim?.body ||
         result
       );
-      const resolvedName = extractedMeta.name || userObj.name || (profile?.config.name || id);
-      const resolvedEmail = extractedMeta.email || userObj.email || currentCookies['gmail'] || '';
+      const resolvedName = extractedMeta.name || userObj.name || body.name || (profile?.config.name || id);
+      const resolvedEmail = extractedMeta.email || userObj.email || body.email || currentCookies['gmail'] || '';
       const resolvedImage = extractedMeta.image || userObj.image || '';
 
       // Auto-save the fetched Gmail and Name into cookies and localStorage so export & persistence keep it
