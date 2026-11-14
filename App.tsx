@@ -4,7 +4,7 @@ import { URL_ACCOUNT, URL_CLAIM, URL_BOTH } from './config';
 import { ThemeProvider } from './components/ThemeProvider';
 import { ThemeToggle } from './components/ThemeToggle';
 
-import { Diamond, Layers, LogOut, RefreshCw, Zap, Import, Download, Sparkles, Volume2, VolumeX, Plus, ArrowUpDown, AlertTriangle, GripVertical } from 'lucide-react';
+import { Diamond, Layers, LogOut, RefreshCw, Zap, Import, Download, Sparkles, Volume2, VolumeX, Plus, ArrowUpDown, AlertTriangle, MoreHorizontal } from 'lucide-react';
 
 import { DrawingCursor } from './components/DrawingCursor';
 import { Preloader } from './components/Preloader';
@@ -37,6 +37,8 @@ function App() {
   const [initialLoading, setInitialLoading] = useState(true);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
 
   // Sorting & Filtering State (default: keep valid at start/top with shortest timer)
   const [sortBy, setSortBy] = useState<SortOption>(() => {
@@ -72,6 +74,27 @@ function App() {
   const profilesRef = useRef(profiles);
   profilesRef.current = profiles;
   const isAutoClaimingRef = useRef(false);
+
+  // Close More menu on outside click / Escape
+  useEffect(() => {
+    if (!isMoreMenuOpen) return;
+
+    const handlePointerDown = (e: MouseEvent) => {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
+        setIsMoreMenuOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsMoreMenuOpen(false);
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isMoreMenuOpen]);
 
   // Initialize with cookies from Env Var and LocalStorage
   useEffect(() => {
@@ -924,46 +947,48 @@ function App() {
 
   return (
     <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
-    <div className="min-h-screen bg-zinc-50 dark:bg-[#09090b] text-zinc-900 dark:text-white font-sans pb-32 relative selection:bg-emerald-500/30 transition-colors duration-300">
+    <div className="min-h-screen bg-[#e8eaee] dark:bg-[#09090b] text-zinc-900 dark:text-white font-sans pb-28 relative selection:bg-emerald-500/30 transition-colors duration-300">
       {initialLoading && <Preloader onFinish={() => setInitialLoading(false)} isLoading={initialLoading} />}
       <DrawingCursor />
       
       {/* Background Effects */}
-      <div className="fixed inset-0 bg-grid-pattern z-0 opacity-40 pointer-events-none invert dark:invert-0"></div>
-      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] bg-emerald-500/5 dark:bg-emerald-900/10 blur-[120px] rounded-full z-0 pointer-events-none"></div>
+      <div className="fixed inset-0 bg-grid-pattern z-0 opacity-[0.55] dark:opacity-40 pointer-events-none invert dark:invert-0"></div>
+      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[800px] h-[420px] bg-emerald-500/15 dark:bg-emerald-900/10 blur-[120px] rounded-full z-0 pointer-events-none"></div>
+      <div className="fixed bottom-0 right-0 w-[480px] h-[320px] bg-sky-400/10 dark:bg-transparent blur-[100px] rounded-full z-0 pointer-events-none"></div>
+
+      {/* Max-width shell */}
+      <div className="relative z-10 mx-auto w-full max-w-6xl px-3 sm:px-6">
 
       {/* Header */}
-      <header className="sticky top-4 z-40 max-w-[1600px] mx-auto px-4 lg:px-6">
-        <div className="bg-white/70 dark:bg-[#121214]/70 backdrop-blur-3xl border border-zinc-200 dark:border-white/10 rounded-2xl shadow-xl dark:shadow-2xl flex items-center justify-between px-5 h-16 transition-colors duration-300">
+      <header className="sticky top-3 sm:top-4 z-40 pt-1">
+        <div className="bg-white/55 dark:bg-[#121214]/70 backdrop-blur-3xl border border-zinc-300/70 dark:border-white/10 rounded-2xl shadow-lg shadow-zinc-400/15 dark:shadow-2xl flex items-center justify-between gap-3 px-3.5 sm:px-5 h-14 sm:h-16 transition-colors duration-300">
             
             {/* Logo Area */}
-            <div className="flex items-center gap-3">
-                <div className="relative">
+            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                <div className="relative shrink-0">
                     <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center shadow-[0_0_15px_rgba(16,185,129,0.4)]">
                         <Diamond size={16} className="text-black fill-current" />
                     </div>
                     <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-white rounded-full animate-pulse"></div>
                 </div>
-                <div>
-                    <h1 className="text-sm font-bold tracking-tight text-zinc-900 dark:text-white leading-none">UNLUCID<span className="text-zinc-400 dark:text-zinc-500 font-light ml-1">MANAGER</span></h1>
-                    <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono tracking-wider mt-0.5">V2.0 DASHBOARD</p>
+                <div className="min-w-0">
+                    <h1 className="text-sm font-bold tracking-tight text-zinc-900 dark:text-white leading-none truncate">UNLUCID<span className="text-zinc-400 dark:text-zinc-500 font-light ml-1">MANAGER</span></h1>
+                    <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono tracking-wider mt-0.5 hidden min-[380px]:block">V2.0 DASHBOARD</p>
                 </div>
             </div>
 
             {/* Stats & Controls */}
-            <div className="flex items-center gap-3 sm:gap-6">
-                <div className="hidden md:flex items-center gap-3 bg-zinc-100 dark:bg-black/20 px-4 py-1.5 rounded-lg border border-zinc-200 dark:border-white/5">
-                    <div className="flex items-center gap-2 border-r border-zinc-200 dark:border-white/10 pr-4">
-                        <span className="text-[10px] text-zinc-500 uppercase font-bold">Total</span>
-                        <span className="text-sm font-mono font-bold text-zinc-700 dark:text-zinc-200">{totalGems.toLocaleString()}</span>
+            <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+                <div className="flex items-center gap-2.5 sm:gap-3 bg-zinc-200/70 dark:bg-black/20 px-2.5 sm:px-4 py-1.5 rounded-lg border border-zinc-300/80 dark:border-white/5">
+                    <div className="flex items-center gap-1.5 sm:gap-2 border-r border-zinc-200 dark:border-white/10 pr-2.5 sm:pr-3">
+                        <span className="text-[9px] sm:text-[10px] text-zinc-500 uppercase font-bold">Total</span>
+                        <span className="text-xs sm:text-sm font-mono font-bold text-zinc-700 dark:text-zinc-200">{totalGems.toLocaleString()}</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <span className="text-[10px] text-zinc-500 uppercase font-bold">Ready</span>
-                        <span className={`text-sm font-mono font-bold ${readyToClaim > 0 ? 'text-emerald-400' : 'text-zinc-500'}`}>{readyToClaim}</span>
+                    <div className="flex items-center gap-1.5 sm:gap-2">
+                        <span className="text-[9px] sm:text-[10px] text-zinc-500 uppercase font-bold">Ready</span>
+                        <span className={`text-xs sm:text-sm font-mono font-bold ${readyToClaim > 0 ? 'text-emerald-400' : 'text-zinc-500'}`}>{readyToClaim}</span>
                     </div>
                 </div>
-
-                <div className="h-6 w-px bg-zinc-200 dark:bg-white/10 hidden sm:block"></div>
                 
                 <ThemeToggle />
             </div>
@@ -971,31 +996,38 @@ function App() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-[1600px] mx-auto px-4 lg:px-6 py-8 relative z-10">
+      <main className="py-6 sm:py-8">
         
-        {/* Toolbar */}
-        <div className="flex flex-col gap-4 mb-6">
-          <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
-            
-            {/* Title & Filter Pills */}
-            <div className="flex flex-wrap items-center gap-3">
-              <h2 className="text-lg font-bold text-zinc-900 dark:text-white flex items-center gap-2">
-                Accounts
-                <span className="flex items-center justify-center w-6 h-6 text-[10px] bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 rounded-full border border-zinc-200 dark:border-zinc-700">
-                  {profiles.length}
+        {/* Toolbar — stacked on mobile, one row on desktop */}
+        <div className="flex flex-col gap-3 mb-5 sm:mb-6 md:flex-row md:items-center md:justify-between md:gap-4">
+          {/* Title + filters */}
+          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 min-w-0">
+            <h2 className="text-base sm:text-lg font-bold text-zinc-900 dark:text-white flex items-center gap-2 shrink-0">
+              Accounts
+              <span className="flex items-center justify-center w-6 h-6 text-[10px] bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 rounded-full border border-zinc-200 dark:border-zinc-700">
+                {profiles.length}
+              </span>
+              {autoClaimEnabled && (
+                <span className="ml-1 inline-flex items-center gap-1.5 text-[10px] font-mono font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                  </span>
+                  Auto{autoClaimCount > 0 ? ` · ${autoClaimCount}` : ''}
                 </span>
-              </h2>
+              )}
+            </h2>
 
-              {/* Filter Pills */}
-              <div className="flex items-center bg-zinc-100 dark:bg-black/30 p-1 rounded-xl border border-zinc-200 dark:border-white/5 text-xs">
+            <div className="flex items-center overflow-x-auto no-scrollbar max-w-full">
+              <div className="flex items-center bg-zinc-200/60 dark:bg-black/30 p-1 rounded-xl border border-zinc-300/70 dark:border-white/5 text-xs shrink-0">
                 <button
                   onClick={() => {
                     setFilterBy('all');
                     localStorage.setItem('unlucid_filter_by', 'all');
                   }}
-                  className={`px-3 py-1 rounded-lg font-semibold transition-all ${
+                  className={`px-3 py-1.5 rounded-lg font-semibold transition-all ${
                     filterBy === 'all'
-                      ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-sm'
+                      ? 'bg-white/90 dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-sm'
                       : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
                   }`}
                 >
@@ -1006,7 +1038,7 @@ function App() {
                     setFilterBy('valid');
                     localStorage.setItem('unlucid_filter_by', 'valid');
                   }}
-                  className={`px-3 py-1 rounded-lg font-semibold transition-all flex items-center gap-1.5 ${
+                  className={`px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1.5 ${
                     filterBy === 'valid'
                       ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/20'
                       : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
@@ -1022,7 +1054,7 @@ function App() {
                       setFilterBy('ready');
                       localStorage.setItem('unlucid_filter_by', 'ready');
                     }}
-                    className={`px-3 py-1 rounded-lg font-semibold transition-all flex items-center gap-1.5 ${
+                    className={`px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1.5 ${
                       filterBy === 'ready'
                         ? 'bg-amber-500 text-white shadow-sm shadow-amber-500/20'
                         : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
@@ -1038,7 +1070,7 @@ function App() {
                       setFilterBy('offline');
                       localStorage.setItem('unlucid_filter_by', 'offline');
                     }}
-                    className={`px-3 py-1 rounded-lg font-semibold transition-all flex items-center gap-1.5 ${
+                    className={`px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1.5 ${
                       filterBy === 'offline'
                         ? 'bg-red-500/90 text-white shadow-sm'
                         : 'text-zinc-400 hover:text-red-500'
@@ -1050,24 +1082,14 @@ function App() {
                   </button>
                 )}
               </div>
-
-              {autoClaimEnabled && (
-                <div className="hidden 2xl:flex items-center gap-2 text-[11px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full animate-in fade-in duration-300">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                  </span>
-                  <span>Auto-Pilot: Scanning timers {autoClaimCount > 0 ? `(${autoClaimCount} claimed)` : ''}</span>
-                </div>
-              )}
             </div>
+          </div>
 
-            {/* Right Controls: Sort & Action Buttons */}
-            <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto">
-              {/* Sort Selector */}
-              <div className="flex items-center gap-1.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-2.5 py-2 text-xs text-zinc-600 dark:text-zinc-300 shadow-sm dark:shadow-none">
+          {/* Controls — 2 rows on mobile, one compact row on desktop */}
+          <div className="flex flex-col gap-2 w-full md:w-auto md:flex-row md:items-center md:gap-2 shrink-0">
+            <div className="grid grid-cols-2 gap-2 md:flex md:items-center md:gap-2">
+              <div className="flex items-center gap-1.5 min-h-10 bg-white/70 dark:bg-zinc-900 border border-zinc-300/80 dark:border-zinc-800 rounded-lg px-2.5 text-xs text-zinc-600 dark:text-zinc-300 shadow-sm dark:shadow-none">
                 <ArrowUpDown size={13} className="text-zinc-400 shrink-0" />
-                <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider hidden sm:inline">Sort:</span>
                 <select
                   value={sortBy}
                   onChange={(e) => {
@@ -1075,25 +1097,25 @@ function App() {
                     setSortBy(val);
                     localStorage.setItem('unlucid_sort_by', val);
                   }}
-                  className="bg-transparent border-none text-xs font-semibold text-zinc-800 dark:text-zinc-200 focus:outline-none cursor-pointer pr-1"
+                  className="w-full md:w-auto bg-transparent border-none text-xs font-semibold text-zinc-800 dark:text-zinc-200 focus:outline-none cursor-pointer"
+                  aria-label="Sort accounts"
                 >
-                  <option value="valid_first" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white">Valid at Top (Shortest Timer)</option>
-                  <option value="gems" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white">Highest Gems</option>
-                  <option value="name" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white">Name (A - Z)</option>
-                  <option value="custom" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white">Custom (Drag)</option>
+                  <option value="valid_first" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white">Valid first</option>
+                  <option value="gems" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white">Highest gems</option>
+                  <option value="name" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white">Name A–Z</option>
+                  <option value="custom" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white">Custom</option>
                 </select>
               </div>
 
-              {/* Auto-Pilot Toggle */}
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 min-w-0">
                 <button 
                   onClick={toggleAutoClaim}
-                  className={`px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 border shadow-sm ${
+                  className={`flex-1 md:flex-none min-h-10 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 border shadow-sm ${
                     autoClaimEnabled
-                      ? 'bg-emerald-500/10 dark:bg-emerald-950/40 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 ring-1 ring-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.15)]'
-                      : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-700'
+                      ? 'bg-emerald-500/10 dark:bg-emerald-950/40 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 ring-1 ring-emerald-500/30'
+                      : 'bg-white/70 dark:bg-zinc-900 border-zinc-300/80 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400'
                   }`}
-                  title={autoClaimEnabled ? "Auto-Claim is Active (Hands-Free Monitoring)" : "Turn On Hands-Free Auto-Claim"}
+                  title={autoClaimEnabled ? "Auto-Claim is Active" : "Turn On Auto-Claim"}
                 >
                   <div className="relative flex items-center justify-center">
                     <Sparkles size={13} className={autoClaimEnabled ? "text-emerald-500 animate-pulse" : "text-zinc-400"} />
@@ -1104,7 +1126,7 @@ function App() {
                       </span>
                     )}
                   </div>
-                  <span>Auto-Pilot: <strong className={autoClaimEnabled ? "text-emerald-600 dark:text-emerald-400 font-extrabold" : "text-zinc-500 dark:text-zinc-400 font-medium"}>{autoClaimEnabled ? "ON" : "OFF"}</strong></span>
+                  <span>Auto <strong className={autoClaimEnabled ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-500"}>{autoClaimEnabled ? "ON" : "OFF"}</strong></span>
                 </button>
 
                 {autoClaimEnabled && (
@@ -1114,74 +1136,115 @@ function App() {
                       setSoundEnabled(next);
                       localStorage.setItem('unlucid_sound_enabled', String(next));
                     }}
-                    className={`p-2 rounded-lg border text-xs transition-colors ${
+                    className={`min-h-10 min-w-10 flex items-center justify-center rounded-lg border text-xs transition-colors shrink-0 ${
                       soundEnabled 
-                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20' 
-                        : 'bg-zinc-100 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-400 hover:text-zinc-600'
+                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400' 
+                        : 'bg-zinc-100 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-400'
                     }`}
-                    title={soundEnabled ? "Audio Chime ON (Click to Mute)" : "Audio Chime Muted (Click to Unmute)"}
+                    title={soundEnabled ? "Mute chime" : "Unmute chime"}
                   >
-                    {soundEnabled ? <Volume2 size={13} /> : <VolumeX size={13} />}
+                    {soundEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
                   </button>
                 )}
               </div>
+            </div>
 
-              <div className="h-5 w-px bg-zinc-200 dark:bg-white/10 hidden sm:block"></div>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={handleClaimAll}
+                disabled={profiles.length === 0 || readyToClaim === 0 || globalLoading}
+                className={`flex-1 md:flex-none min-h-10 px-3.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm ${
+                  profiles.length > 0 && readyToClaim > 0 
+                    ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/20' 
+                    : 'bg-zinc-200/80 dark:bg-zinc-900 text-zinc-500 dark:text-zinc-600 border border-zinc-300/80 dark:border-zinc-800 cursor-not-allowed'
+                }`}
+              >
+                {globalLoading ? <Zap className="animate-spin" size={13}/> : <Layers size={13} />}
+                Claim All{readyToClaim > 0 ? ` (${readyToClaim})` : ''}
+              </button>
 
               <button 
                 onClick={() => setIsAddModalOpen(true)}
-                className="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm shadow-emerald-500/20 hover:shadow-emerald-500/30"
+                className="min-h-10 px-3.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm shadow-emerald-500/20 shrink-0"
               >
                 <Plus size={14} />
-                Add Account
+                Add
               </button>
-              <button 
-                onClick={() => setIsImportModalOpen(true)}
-                className="px-3 py-2 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 text-zinc-700 dark:text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm dark:shadow-none"
-              >
-                <Import size={13} />
-                Import
-              </button>
-              <button 
-                onClick={handleExportCookies}
-                disabled={profiles.length === 0}
-                className={`px-3 py-2 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 text-zinc-700 dark:text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm dark:shadow-none ${profiles.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
-                <Download size={13} />
-                Export
-              </button>
-              {profiles.length > 0 && (
-                <>
-                  <button 
-                    onClick={handleRefreshAll}
-                    disabled={globalLoading}
-                    className="px-3 py-2 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 text-zinc-700 dark:text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm dark:shadow-none"
-                  >
-                    <RefreshCw size={13} className={globalLoading ? "animate-spin" : ""} />
-                    Sync
-                  </button>
-                  <button 
-                    onClick={handleClaimAll}
-                    disabled={readyToClaim === 0 || globalLoading}
-                    className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-md ${
-                      readyToClaim > 0 
-                        ? 'bg-emerald-500 hover:bg-emerald-600 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white shadow-emerald-500/20 dark:shadow-emerald-900/20' 
-                        : 'bg-zinc-100 dark:bg-zinc-900 text-zinc-400 dark:text-zinc-600 border border-zinc-200 dark:border-zinc-800 cursor-not-allowed'
-                    }`}
-                  >
-                    {globalLoading ? <Zap className="animate-spin" size={13}/> : <Layers size={13} />}
-                    Claim All ({readyToClaim})
-                  </button>
-                </>
-              )}
+
+              <div className="relative shrink-0" ref={moreMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsMoreMenuOpen(prev => !prev)}
+                  className={`min-h-10 min-w-10 flex items-center justify-center rounded-lg border text-xs font-bold transition-all shadow-sm ${
+                    isMoreMenuOpen
+                      ? 'bg-zinc-200 dark:bg-zinc-800 border-zinc-400 dark:border-zinc-600 text-zinc-900 dark:text-white'
+                      : 'bg-white/70 dark:bg-zinc-900 border-zinc-300/80 dark:border-zinc-800 text-zinc-600 dark:text-zinc-300'
+                  }`}
+                  aria-label="More actions"
+                  aria-expanded={isMoreMenuOpen}
+                >
+                  <MoreHorizontal size={16} />
+                </button>
+
+                {isMoreMenuOpen && (
+                  <div className="absolute right-0 top-full mt-2 w-48 z-50 rounded-xl border border-zinc-300/80 dark:border-zinc-800 bg-white/95 dark:bg-zinc-900 shadow-xl dark:shadow-2xl backdrop-blur-xl py-1.5 overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsMoreMenuOpen(false);
+                        setIsImportModalOpen(true);
+                      }}
+                      className="w-full min-h-10 px-3 text-left text-xs font-semibold text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 flex items-center gap-2.5"
+                    >
+                      <Import size={14} className="text-zinc-400" />
+                      Import
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (profiles.length === 0) return;
+                        setIsMoreMenuOpen(false);
+                        handleExportCookies();
+                      }}
+                      disabled={profiles.length === 0}
+                      className={`w-full min-h-10 px-3 text-left text-xs font-semibold flex items-center gap-2.5 ${
+                        profiles.length === 0
+                          ? 'text-zinc-400 dark:text-zinc-600 cursor-not-allowed'
+                          : 'text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800'
+                      }`}
+                    >
+                      <Download size={14} className="text-zinc-400" />
+                      Export
+                    </button>
+                    <div className="my-1 border-t border-zinc-100 dark:border-zinc-800" />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (profiles.length === 0 || globalLoading) return;
+                        setIsMoreMenuOpen(false);
+                        handleRefreshAll();
+                      }}
+                      disabled={profiles.length === 0 || globalLoading}
+                      className={`w-full min-h-10 px-3 text-left text-xs font-semibold flex items-center gap-2.5 ${
+                        profiles.length === 0 || globalLoading
+                          ? 'text-zinc-400 dark:text-zinc-600 cursor-not-allowed'
+                          : 'text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800'
+                      }`}
+                    >
+                      <RefreshCw size={14} className={`text-zinc-400 ${globalLoading ? 'animate-spin' : ''}`} />
+                      Sync all
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
 
         {/* Grid */}
         {profiles.length === 0 ? (
-          <div className="border border-dashed border-zinc-300 dark:border-zinc-800 rounded-3xl p-16 text-center bg-white/50 dark:bg-black/20 backdrop-blur-sm">
-            <div className="w-20 h-20 bg-zinc-100 dark:bg-zinc-900/80 rounded-3xl flex items-center justify-center mx-auto mb-6 text-zinc-400 dark:text-zinc-700 shadow-inner border border-zinc-200 dark:border-white/5">
+          <div className="border border-dashed border-zinc-400/60 dark:border-zinc-800 rounded-3xl p-16 text-center bg-white/40 dark:bg-black/20 backdrop-blur-sm">
+            <div className="w-20 h-20 bg-zinc-200/80 dark:bg-zinc-900/80 rounded-3xl flex items-center justify-center mx-auto mb-6 text-zinc-400 dark:text-zinc-700 shadow-inner border border-zinc-300/80 dark:border-white/5">
               <LogOut size={32} />
             </div>
             <h3 className="text-xl font-bold text-zinc-900 dark:text-white mb-2">No accounts active</h3>
@@ -1207,7 +1270,7 @@ function App() {
             </div>
           </div>
         ) : sortedProfiles.length === 0 ? (
-          <div className="border border-dashed border-zinc-300 dark:border-zinc-800 rounded-3xl p-12 text-center bg-white/50 dark:bg-black/20 backdrop-blur-sm">
+          <div className="border border-dashed border-zinc-400/60 dark:border-zinc-800 rounded-3xl p-12 text-center bg-white/40 dark:bg-black/20 backdrop-blur-sm">
             <p className="text-zinc-500 text-sm mb-3">No {filterBy} accounts found.</p>
             <button
               onClick={() => {
@@ -1229,7 +1292,7 @@ function App() {
               items={sortedProfiles.map(p => p.id)}
               strategy={rectSortingStrategy}
             >
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5 items-start">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 items-start">
                 {sortedProfiles.map(profile => (
                   <SortableAccountCard
                     key={profile.id} 
@@ -1248,13 +1311,13 @@ function App() {
         )}
       </main>
 
-
-      
-      <footer className="fixed bottom-0 left-0 right-0 p-6 text-center z-10 pointer-events-none">
-        <p className="text-[10px] text-zinc-600 font-mono tracking-widest uppercase opacity-50">
-          Unlucid Manager v2.0 • <span className="text-zinc-500">System Active</span>
+      <footer className="pb-8 pt-2 text-center">
+        <p className="text-[10px] text-zinc-500 dark:text-zinc-600 font-mono tracking-widest uppercase">
+          Unlucid Manager v2.0 • <span className="text-zinc-400 dark:text-zinc-500">System Active</span>
         </p>
       </footer>
+
+      </div>
 
       <CookieImportModal 
         isOpen={isImportModalOpen}

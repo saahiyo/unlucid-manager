@@ -39,6 +39,24 @@
         font-family: 'Inter', sans-serif;
         overflow-x: hidden;
       }
+
+      html.light body {
+        background-color: #e8eaee;
+        color: #18181b;
+      }
+
+      /* Centered max-width page feel on ultra-wide displays */
+      #root {
+        min-height: 100vh;
+      }
+
+      .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
       
       /* Grid Pattern Background */
       .bg-grid-pattern {

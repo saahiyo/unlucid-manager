@@ -208,8 +208,8 @@ export const AccountCard: React.FC<AccountCardProps> = ({
     <Card 
       className={`
         relative overflow-hidden flex flex-col
-        bg-white dark:bg-[#121214]/80 hover:bg-zinc-50 dark:hover:bg-[#18181b]/90
-        ${isReady && !isLoading && !isEditing ? 'border-emerald-500/50 shadow-[0_0_30px_-10px_rgba(16,185,129,0.3)]' : 'border-zinc-200 dark:border-white/5 shadow-sm dark:shadow-xl'}
+        bg-white/65 dark:bg-[#121214]/80 hover:bg-white/80 dark:hover:bg-[#18181b]/90 backdrop-blur-md
+        ${isReady && !isLoading && !isEditing ? 'border-emerald-500/50 shadow-[0_0_30px_-10px_rgba(16,185,129,0.3)]' : 'border-zinc-300/70 dark:border-white/5 shadow-sm shadow-zinc-400/10 dark:shadow-xl'}
       `}
     >
       {/* Loading Overlay */}
@@ -508,7 +508,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({
           {/* Main Stats Row */}
           <div className="grid grid-cols-2 gap-3 mb-4">
             {/* Gems */}
-            <div className="bg-zinc-50 dark:bg-black/40 rounded-lg p-3 border border-zinc-200 dark:border-white/5 relative group">
+            <div className="bg-zinc-100/90 dark:bg-black/40 rounded-lg p-3 border border-zinc-300/60 dark:border-white/5 relative group">
               <div className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider mb-1 flex items-center gap-1">
                 <Gem size={10} className="text-purple-500" /> Balance
               </div>
@@ -518,7 +518,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({
             </div>
 
             {/* Timer */}
-            <div className={`rounded-lg p-3 border relative group transition-colors ${isReady ? 'bg-emerald-500/5 dark:bg-emerald-900/10 border-emerald-500/20' : 'bg-zinc-50 dark:bg-black/40 border-zinc-200 dark:border-white/5'}`}>
+            <div className={`rounded-lg p-3 border relative group transition-colors ${isReady ? 'bg-emerald-500/10 dark:bg-emerald-900/10 border-emerald-500/25' : 'bg-zinc-100/90 dark:bg-black/40 border-zinc-300/60 dark:border-white/5'}`}>
               <div className="text-[9px] font-bold uppercase tracking-wider mb-1 flex items-center justify-between transition-colors">
                 {isReady ? (
                   <span className="text-emerald-500 flex items-center gap-1">
@@ -616,7 +616,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({
                 w-full py-3 rounded-lg text-xs font-bold uppercase tracking-widest transition-all duration-300 flex items-center justify-center gap-2 border
                 ${isReady 
                     ? 'bg-emerald-500 hover:bg-emerald-600 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white border-transparent shadow-[0_0_20px_-5px_rgba(16,185,129,0.4)] hover:shadow-[0_0_25px_-5px_rgba(16,185,129,0.6)] translate-y-0' 
-                    : 'bg-zinc-100 dark:bg-zinc-800/50 text-zinc-500 dark:text-zinc-600 border-zinc-200 dark:border-white/5 cursor-not-allowed hover:bg-zinc-200 dark:hover:bg-zinc-800'
+                    : 'bg-zinc-200/70 dark:bg-zinc-800/50 text-zinc-500 dark:text-zinc-600 border-zinc-300/70 dark:border-white/5 cursor-not-allowed hover:bg-zinc-300/70 dark:hover:bg-zinc-800'
                 }
               `}
             >

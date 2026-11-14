@@ -116,7 +116,7 @@ export function CookieImportModal({ isOpen, onClose, onSave, initialData = [] }:
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="w-full max-w-3xl bg-white dark:bg-[#121214] rounded-2xl shadow-2xl border border-zinc-200 dark:border-zinc-800 flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200">
+      <div className="w-full max-w-3xl bg-[#f2f3f5] dark:bg-[#121214] rounded-2xl shadow-2xl border border-zinc-300/80 dark:border-zinc-800 flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200">
         
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-zinc-100 dark:border-zinc-800">

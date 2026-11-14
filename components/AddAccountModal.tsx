@@ -118,7 +118,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
       }}
     >
       <div 
-        className="w-full max-w-md bg-white dark:bg-[#121214] border border-zinc-200 dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+        className="w-full max-w-md bg-[#f2f3f5] dark:bg-[#121214] border border-zinc-300/80 dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
         onKeyDown={(e) => {
           if (e.key === 'Escape') onClose();
         }}
