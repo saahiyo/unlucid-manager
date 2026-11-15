@@ -26,7 +26,8 @@ interface AccountCardProps {
   profile: ProfileState;
   onClaim: (id: string) => void;
   onRefresh: (id: string) => void;
-  onUpdate: (id: string, newName: string, newToken: string) => Promise<void> | void;
+  /** Cookie-only update — gmail / id stay locked */
+  onUpdate: (id: string, newToken: string) => Promise<void> | void;
   onDelete: (id: string) => void;
   onSetTimer?: (id: string, nextFreeGemsAt: number) => void;
 }
@@ -47,9 +48,8 @@ export const AccountCard: React.FC<AccountCardProps> = ({
 
   const { data, status, config } = profile;
 
-  // In-card edit states
+  // In-card edit states (cookies only — identity is locked)
   const [isEditing, setIsEditing] = useState(false);
-  const [editName, setEditName] = useState(profile.config.name);
   const [editToken, setEditToken] = useState(
     getPrimaryToken(profile.config.cookies)
   );
@@ -57,6 +57,8 @@ export const AccountCard: React.FC<AccountCardProps> = ({
   const [isDeletingConfirm, setIsDeletingConfirm] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+
+  const lockedEmail = data?.email || config.email || config.cookies['gmail'];
 
   // Quick Timer adjustment state
   const [isEditingTimer, setIsEditingTimer] = useState(false);
@@ -99,11 +101,10 @@ export const AccountCard: React.FC<AccountCardProps> = ({
     setCustomTimerInput('');
   };
 
-  // Keep edit fields in sync if config changes
+  // Keep token field in sync if cookies change
   useEffect(() => {
-    setEditName(config.name);
     setEditToken(getPrimaryToken(config.cookies));
-  }, [config.name, config.cookies]);
+  }, [config.cookies]);
 
   useEffect(() => {
     if (!data) return;
@@ -163,26 +164,21 @@ export const AccountCard: React.FC<AccountCardProps> = ({
   };
 
   const handleSaveEdit = async () => {
-    const trimmedName = editName.trim();
     const trimmedToken = editToken.trim();
 
-    if (!trimmedName) {
-      setEditError("Account name cannot be empty");
-      return;
-    }
     if (!trimmedToken) {
-      setEditError("Session token cannot be empty");
+      setEditError('Paste a new session token / cookies');
       return;
     }
 
     setIsSaving(true);
     setEditError(null);
     try {
-      await onUpdate(profile.id, trimmedName, trimmedToken);
+      await onUpdate(profile.id, trimmedToken);
       setIsEditing(false);
       setIsDeletingConfirm(false);
     } catch (err: any) {
-      setEditError(err.message || "Failed to update account");
+      setEditError(err.message || 'Failed to update cookies');
     } finally {
       setIsSaving(false);
     }
@@ -195,8 +191,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({
     } else if (e.key === 'Escape') {
       setIsEditing(false);
       setIsDeletingConfirm(false);
-      setEditName(config.name);
-      setEditToken(config.cookies["__Secure-authjs.session-token"] || Object.values(config.cookies)[0] || "");
+      setEditToken(getPrimaryToken(config.cookies));
       setEditError(null);
     }
   };
@@ -226,8 +221,10 @@ export const AccountCard: React.FC<AccountCardProps> = ({
               <Key size={14} />
             </div>
             <div>
-              <h3 className="font-semibold text-xs text-zinc-800 dark:text-zinc-200">Edit account</h3>
-              <p className="text-[10px] text-zinc-400 dark:text-zinc-500">Update credentials</p>
+              <h3 className="font-semibold text-xs text-zinc-800 dark:text-zinc-200">Update cookies</h3>
+              <p className="text-[10px] text-zinc-400 dark:text-zinc-500">
+                {lockedEmail ? 'Gmail stays locked — refresh session only' : 'Paste a new session token'}
+              </p>
             </div>
           </div>
           
@@ -236,8 +233,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({
             onClick={() => {
               setIsEditing(false);
               setIsDeletingConfirm(false);
-              setEditName(config.name);
-              setEditToken(config.cookies["__Secure-authjs.session-token"] || Object.values(config.cookies)[0] || "");
+              setEditToken(getPrimaryToken(config.cookies));
               setEditError(null);
             }}
             className="p-1.5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/5 rounded-md transition-colors"
@@ -272,15 +268,14 @@ export const AccountCard: React.FC<AccountCardProps> = ({
                 className="flex items-center gap-1 mt-0.5 group/email cursor-pointer text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors"
                 onClick={(e) => {
                   e.stopPropagation();
-                  const targetEmail = data?.email || config.cookies['gmail'];
-                  if (targetEmail) copyEmailToClipboard(targetEmail);
+                  if (lockedEmail) copyEmailToClipboard(lockedEmail);
                 }}
-                title={data?.email || config.cookies['gmail'] ? "Click to copy Gmail address" : ""}
+                title={lockedEmail ? 'Click to copy Gmail address' : ''}
               >
                 <p className="text-[11px] truncate font-mono">
-                  {data?.email || config.cookies['gmail'] || '...'}
+                  {lockedEmail || '...'}
                 </p>
-                {(data?.email || config.cookies['gmail']) && (
+                {lockedEmail && (
                   <span className="opacity-0 group-hover/email:opacity-100 transition-opacity shrink-0">
                     {copiedEmail ? <Check size={10} className="text-emerald-500" /> : <Copy size={10} />}
                   </span>
@@ -297,7 +292,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({
                 setIsDeletingConfirm(false);
               }}
               className="p-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/5 rounded-md transition-colors"
-              title="Edit Account"
+              title="Update cookies"
             >
               <Pencil size={13} />
             </button>
@@ -316,71 +311,48 @@ export const AccountCard: React.FC<AccountCardProps> = ({
       {isEditing ? (
         <div className="flex-1 p-4 flex flex-col justify-between space-y-4 animate-in fade-in duration-200">
           <div className="space-y-3">
-            {/* Auto-detected Google Account / Gmail Card */}
-            {(data?.email || config.cookies['gmail'] || data?.name) && (
-              <div className="p-2.5 rounded-lg bg-emerald-500/5 border border-emerald-500/15 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 overflow-hidden min-w-0">
-                  {data?.image ? (
-                    <img 
-                      src={data.image} 
-                      alt="" 
-                      className="w-6 h-6 rounded-full object-cover shrink-0" 
-                      referrerPolicy="no-referrer"
-                    />
-                  ) : (
-                    <div className="w-6 h-6 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-                      <Mail size={12} />
-                    </div>
-                  )}
-                  <div className="overflow-hidden min-w-0">
-                    {data?.name && (
-                      <p className="text-[11px] font-semibold text-zinc-800 dark:text-zinc-200 truncate leading-tight">
-                        {data.name}
-                      </p>
-                    )}
-                    <p className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono truncate leading-tight">
-                      {data?.email || config.cookies['gmail']}
-                    </p>
+            {/* Locked identity — gmail recorded once, not editable */}
+            <div className="p-2.5 rounded-lg bg-emerald-500/5 border border-emerald-500/15 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 overflow-hidden min-w-0">
+                {data?.image ? (
+                  <img
+                    src={data.image}
+                    alt=""
+                    className="w-6 h-6 rounded-full object-cover shrink-0"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <div className="w-6 h-6 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                    <Mail size={12} />
                   </div>
-                </div>
-
-                {(data?.email || config.cookies['gmail']) && (
-                  <button
-                    type="button"
-                    onClick={() => copyEmailToClipboard(data?.email || config.cookies['gmail'])}
-                    className="p-1 text-zinc-400 hover:text-emerald-500 dark:hover:text-emerald-400 rounded transition-colors shrink-0"
-                    title="Copy Gmail"
-                  >
-                    {copiedEmail ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
-                  </button>
                 )}
+                <div className="overflow-hidden min-w-0">
+                  <p className="text-[11px] font-semibold text-zinc-800 dark:text-zinc-200 truncate leading-tight">
+                    {data?.name || config.name}
+                  </p>
+                  <p className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono truncate leading-tight">
+                    {lockedEmail || 'Gmail locks after first successful sync'}
+                  </p>
+                </div>
               </div>
-            )}
 
-            {/* Account Name Field */}
-            <div>
-              <label className="block text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-1.5">
-                Account Name
-              </label>
-              <input
-                type="text"
-                value={editName}
-                onChange={(e) => {
-                  setEditName(e.target.value);
-                  if (editError) setEditError(null);
-                }}
-                onKeyDown={handleKeyDown}
-                placeholder="e.g. Account 1"
-                className="w-full px-3 py-2 text-xs bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-white/10 rounded-lg text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 transition-colors"
-                autoFocus
-              />
+              {lockedEmail && (
+                <button
+                  type="button"
+                  onClick={() => copyEmailToClipboard(lockedEmail)}
+                  className="p-1 text-zinc-400 hover:text-emerald-500 dark:hover:text-emerald-400 rounded transition-colors shrink-0"
+                  title="Copy Gmail"
+                >
+                  {copiedEmail ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+                </button>
+              )}
             </div>
 
-            {/* Session Token Field */}
+            {/* Session Token Field only */}
             <div>
               <div className="flex justify-between items-center mb-1.5">
                 <label className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
-                  Session Token
+                  New session cookies
                 </label>
                 <button
                   type="button"
@@ -392,15 +364,16 @@ export const AccountCard: React.FC<AccountCardProps> = ({
               </div>
               <div className="relative">
                 <input
-                  type={showToken ? "text" : "password"}
+                  type={showToken ? 'text' : 'password'}
                   value={editToken}
                   onChange={(e) => {
                     setEditToken(e.target.value);
                     if (editError) setEditError(null);
                   }}
                   onKeyDown={handleKeyDown}
-                  placeholder="__Secure-authjs.session-token..."
+                  placeholder="Paste token, cookie string, or curl…"
                   className="w-full px-3 py-2 pr-9 text-xs font-mono bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-white/10 rounded-lg text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 transition-colors"
+                  autoFocus
                 />
                 {editToken && (
                   <button
@@ -463,8 +436,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({
                     type="button"
                     onClick={() => {
                       setIsEditing(false);
-                      setEditName(config.name);
-                      setEditToken(config.cookies["__Secure-authjs.session-token"] || Object.values(config.cookies)[0] || "");
+                      setEditToken(getPrimaryToken(config.cookies));
                       setEditError(null);
                     }}
                     className="px-3 py-1.5 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white rounded-lg hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors"
@@ -481,12 +453,12 @@ export const AccountCard: React.FC<AccountCardProps> = ({
                     {isSaving ? (
                       <>
                         <Loader2 size={12} className="animate-spin" />
-                        Saving...
+                        Saving…
                       </>
                     ) : (
                       <>
                         <Save size={12} />
-                        Save
+                        Update cookies
                       </>
                     )}
                   </button>

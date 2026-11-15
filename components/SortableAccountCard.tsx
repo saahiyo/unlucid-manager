@@ -9,7 +9,7 @@ interface SortableAccountCardProps {
   profile: ProfileState;
   onClaim: (id: string) => void;
   onRefresh: (id: string) => void;
-  onUpdate: (id: string, newName: string, newToken: string) => Promise<void> | void;
+  onUpdate: (id: string, newToken: string) => Promise<void> | void;
   onDelete: (id: string) => void;
   onSetTimer?: (id: string, nextFreeGemsAt: number) => void;
   isDragEnabled: boolean;

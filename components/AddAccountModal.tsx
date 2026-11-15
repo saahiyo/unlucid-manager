@@ -125,7 +125,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
         <div className="px-5 py-4 border-b border-zinc-200/80 dark:border-white/5 flex justify-between items-center">
           <div>
             <h3 className="text-sm font-semibold text-zinc-900 dark:text-white">Add account</h3>
-            <p className="text-xs text-zinc-500 mt-0.5">Paste a session token to connect</p>
+            <p className="text-xs text-zinc-500 mt-0.5">Gmail locks after sync — later you only refresh cookies</p>
           </div>
           <button
             onClick={onClose}

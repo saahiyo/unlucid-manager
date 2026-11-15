@@ -11,6 +11,17 @@ import { AddAccountModal } from './components/AddAccountModal';
 import { SortableAccountCard } from './components/SortableAccountCard';
 import { parseCookiesInput, getPrimaryToken } from './cookieUtils';
 import { apiBatchFetch, apiClaimGems, apiFetchAccount } from './lib/api';
+import {
+  createLocalAccount,
+  loadMergedAccounts,
+  lockAccountIdentity,
+  normalizeEmail,
+  removeAccount,
+  unmarkDeleted,
+  updateAccountCookiesOnly,
+  upsertAccount,
+  type StoredAccount,
+} from './lib/accountStore';
 
 import {
   DndContext,
@@ -86,243 +97,97 @@ function App() {
     };
   }, [isMoreMenuOpen]);
 
-  // Initialize with cookies from Env Var and LocalStorage
+  const storedToProfile = (account: StoredAccount): ProfileState => ({
+    id: account.id,
+    config: {
+      name: account.label,
+      email: account.email,
+      cookies: account.cookies,
+    },
+    data: null,
+    status: 'loading',
+  });
+
+  // Initialize from stable account registry (+ env / legacy migrate)
   useEffect(() => {
-    const loadAllCookies = () => {
-      let combinedCookies: RawCookiesJson = {};
-
-      // 1. Load from Env
-      try {
-        const cookiesEnv = import.meta.env.VITE_COOKIES;
-        if (cookiesEnv) {
-          const parsedEnv = JSON.parse(cookiesEnv);
-          combinedCookies = { ...combinedCookies, ...parsedEnv };
-        }
-      } catch (e) {
-        console.error('Failed to parse VITE_COOKIES', e);
-      }
-
-      // 2. Load from LocalStorage
-      try {
-        const localCookies = localStorage.getItem('unlucid_imported_cookies');
-        if (localCookies) {
-          const parsedLocal = JSON.parse(localCookies);
-          combinedCookies = { ...combinedCookies, ...parsedLocal };
-        }
-      } catch (e) {
-        console.error('Failed to parse local cookies', e);
-      }
-
-      // 3. Filter out deleted accounts
-      try {
-        const deletedRaw = localStorage.getItem('unlucid_deleted_accounts');
-        if (deletedRaw) {
-          const deletedAccounts: string[] = JSON.parse(deletedRaw);
-          deletedAccounts.forEach(delKey => {
-            delete combinedCookies[delKey];
-          });
-        }
-      } catch (e) {
-        console.error('Failed to parse deleted accounts', e);
-      }
-
-      // 4. Deduplicate entries sharing the exact same primary session token
-      const deduplicatedCookies: RawCookiesJson = {};
-      const seenTokens = new Map<string, string>(); // token -> existingKey
-
-      Object.entries(combinedCookies).forEach(([key, cookies]) => {
-        const token = getPrimaryToken(cookies);
-        if (!token) {
-          deduplicatedCookies[key] = cookies;
-          return;
-        }
-
-        const existingKey = seenTokens.get(token);
-        if (!existingKey) {
-          seenTokens.set(token, key);
-          deduplicatedCookies[key] = cookies;
-        } else {
-          // If collision occurs and this key has a custom/human name while the existing one is generic, prefer custom name
-          const existingIsGeneric = /^account \d+$/i.test(existingKey);
-          const currentIsGeneric = /^account \d+$/i.test(key);
-
-          if (existingIsGeneric && !currentIsGeneric) {
-            delete deduplicatedCookies[existingKey];
-            seenTokens.set(token, key);
-            deduplicatedCookies[key] = cookies;
-          }
-        }
-      });
-
-      if (Object.keys(deduplicatedCookies).length > 0) {
-        handleLoadCookies(deduplicatedCookies);
-      } else {
-        setAccountsReady(true);
-      }
-    };
-
-    loadAllCookies();
+    const accounts = loadMergedAccounts(import.meta.env.VITE_COOKIES as string | undefined);
+    if (accounts.length > 0) {
+      handleLoadAccounts(accounts);
+    } else {
+      setAccountsReady(true);
+    }
   }, []);
 
   const handleSaveImportedCookies = (importedAccounts: { name: string; token: string }[]) => {
-    // Deduplicate imported accounts by primary token
     const seenTokens = new Set<string>();
-    const deduplicatedAccounts: { name: string; token: string }[] = [];
 
-    importedAccounts.forEach(acc => {
+    importedAccounts.forEach((acc) => {
       const parsed = parseCookiesInput(acc.token);
       const token = getPrimaryToken(parsed) || acc.token.trim();
-      if (!seenTokens.has(token)) {
-        seenTokens.add(token);
-        deduplicatedAccounts.push(acc);
-      }
+      if (!token || seenTokens.has(token)) return;
+      seenTokens.add(token);
+
+      const created = createLocalAccount(acc.name, parsed);
+      unmarkDeleted(created.id);
+      if (created.email) unmarkDeleted(created.email);
+      upsertAccount(created);
     });
 
-    // Convert array to RawCookiesJson format using universal parser
-    const newCookies: RawCookiesJson = {};
-    const importedNames: string[] = [];
-    deduplicatedAccounts.forEach(acc => {
-      newCookies[acc.name] = parseCookiesInput(acc.token);
-      importedNames.push(acc.name);
-    });
-
-    // Unmark imported names from deleted accounts if any
-    try {
-      const deletedRaw = localStorage.getItem('unlucid_deleted_accounts');
-      if (deletedRaw) {
-        let deletedList: string[] = JSON.parse(deletedRaw);
-        deletedList = deletedList.filter(d => !importedNames.includes(d));
-        localStorage.setItem('unlucid_deleted_accounts', JSON.stringify(deletedList));
-      }
-    } catch (e) {}
-
-    // Save to LocalStorage
-    localStorage.setItem('unlucid_imported_cookies', JSON.stringify(newCookies));
-
-    // Merge with Env cookies and reload
-    let combinedCookies: RawCookiesJson = { ...newCookies };
-    try {
-        const cookiesEnv = import.meta.env.VITE_COOKIES;
-        if (cookiesEnv) {
-             const parsedEnv = JSON.parse(cookiesEnv);
-             combinedCookies = { ...parsedEnv, ...combinedCookies };
-        }
-    } catch(e) {}
-    
-    // Filter deleted accounts
-    try {
-      const deletedRaw = localStorage.getItem('unlucid_deleted_accounts');
-      if (deletedRaw) {
-        const deletedAccounts: string[] = JSON.parse(deletedRaw);
-        deletedAccounts.forEach(delKey => {
-          delete combinedCookies[delKey];
-        });
-      }
-    } catch (e) {}
-
-    handleLoadCookies(combinedCookies);
+    const accounts = loadMergedAccounts(import.meta.env.VITE_COOKIES as string | undefined);
+    handleLoadAccounts(accounts);
   };
 
-  const handleUpdateAccount = async (oldId: string, newName: string, newToken: string) => {
-    const trimmedName = newName.trim();
+  /** Cookie-only refresh — identity (id / gmail) stays locked */
+  const handleUpdateAccount = async (id: string, newToken: string) => {
     const trimmedToken = newToken.trim();
-    if (!trimmedName || !trimmedToken) return;
+    if (!trimmedToken) return;
 
-    // Load existing local storage cookies
-    let localCookies: RawCookiesJson = {};
-    try {
-      const stored = localStorage.getItem('unlucid_imported_cookies');
-      if (stored) {
-        localCookies = JSON.parse(stored);
-      }
-    } catch (e) {
-      console.error('Failed to parse local cookies', e);
-    }
-
-    // Preserve any existing cookies (e.g. gmail or other fields)
-    const existingProfile = profiles.find(p => p.id === oldId);
-    const existingCookies = existingProfile?.config.cookies || localCookies[oldId] || {};
-
-    if (oldId !== trimmedName) {
-      delete localCookies[oldId];
-      // Mark oldId as deleted if it was originally loaded from env so it doesn't reappear
-      try {
-        const deletedRaw = localStorage.getItem('unlucid_deleted_accounts');
-        const deletedList: string[] = deletedRaw ? JSON.parse(deletedRaw) : [];
-        if (!deletedList.includes(oldId)) {
-          deletedList.push(oldId);
-          localStorage.setItem('unlucid_deleted_accounts', JSON.stringify(deletedList));
-        }
-      } catch (e) {}
-    }
-
-    // Unmark new name from deleted accounts if it was previously marked
-    try {
-      const deletedRaw = localStorage.getItem('unlucid_deleted_accounts');
-      if (deletedRaw) {
-        let deletedList: string[] = JSON.parse(deletedRaw);
-        deletedList = deletedList.filter(d => d !== trimmedName);
-        localStorage.setItem('unlucid_deleted_accounts', JSON.stringify(deletedList));
-      }
-    } catch (e) {}
+    const existingProfile = profiles.find((p) => p.id === id);
+    if (!existingProfile) return;
 
     const parsedCookies = parseCookiesInput(trimmedToken);
-    const updatedCookiesRecord = {
-      ...existingCookies,
-      ...parsedCookies
+    const base: StoredAccount = {
+      id: existingProfile.id,
+      label: existingProfile.config.name,
+      email: existingProfile.config.email || normalizeEmail(existingProfile.config.cookies.gmail),
+      cookies: existingProfile.config.cookies,
+      source: 'local',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
     };
-    localCookies[trimmedName] = updatedCookiesRecord;
+    const updated = updateAccountCookiesOnly(base, parsedCookies);
+    unmarkDeleted(updated.id);
+    if (updated.email) unmarkDeleted(updated.email);
+    upsertAccount(updated);
 
-    localStorage.setItem('unlucid_imported_cookies', JSON.stringify(localCookies));
+    setProfiles((prev) =>
+      prev.map((p) =>
+        p.id === id
+          ? {
+              ...p,
+              config: {
+                ...p.config,
+                email: updated.email,
+                cookies: updated.cookies,
+              },
+              status: 'loading',
+              message: undefined,
+            }
+          : p
+      )
+    );
 
-    // Update profiles state
-    setProfiles(prev => {
-      return prev.map(p => {
-        if (p.id === oldId) {
-          return {
-            ...p,
-            id: trimmedName,
-            config: {
-              name: trimmedName,
-              cookies: updatedCookiesRecord
-            },
-            status: 'loading',
-            message: undefined
-          };
-        }
-        return p;
-      });
-    });
-
-    // Auto-fetch fresh data for updated credentials
-    await fetchAccountData(trimmedName, updatedCookiesRecord);
+    await fetchAccountData(id, updated.cookies);
   };
 
   const handleDeleteAccount = (id: string) => {
-    // 1. Remove from local storage
-    try {
-      const stored = localStorage.getItem('unlucid_imported_cookies');
-      if (stored) {
-        const localCookies = JSON.parse(stored);
-        delete localCookies[id];
-        localStorage.setItem('unlucid_imported_cookies', JSON.stringify(localCookies));
-      }
-    } catch (e) {
-      console.error('Failed to parse local cookies', e);
+    const profile = profiles.find((p) => p.id === id);
+    removeAccount(id);
+    const email = normalizeEmail(profile?.config.email || profile?.config.cookies.gmail);
+    if (email && email !== id) {
+      removeAccount(email);
     }
-
-    // 2. Mark as deleted so env does not restore it
-    try {
-      const deletedRaw = localStorage.getItem('unlucid_deleted_accounts');
-      const deletedList: string[] = deletedRaw ? JSON.parse(deletedRaw) : [];
-      if (!deletedList.includes(id)) {
-        deletedList.push(id);
-        localStorage.setItem('unlucid_deleted_accounts', JSON.stringify(deletedList));
-      }
-    } catch (e) {}
-
-    // 3. Update profiles state
-    setProfiles(prev => prev.filter(p => p.id !== id));
+    setProfiles((prev) => prev.filter((p) => p.id !== id && p.id !== email));
   };
 
   const suggestedAccountName = useMemo(() => {
@@ -355,71 +220,55 @@ function App() {
     const newPrimaryToken = getPrimaryToken(newCookiesRecord);
 
     if (newPrimaryToken) {
-      const duplicate = profiles.find(p => {
+      const duplicate = profiles.find((p) => {
         const pt = getPrimaryToken(p.config.cookies);
         return pt && (pt === newPrimaryToken || pt.includes(newPrimaryToken) || newPrimaryToken.includes(pt));
       });
       if (duplicate) {
-        throw new Error(`This session token is already in use by account "${duplicate.config.name}".`);
+        throw new Error(
+          `This session token is already in use by "${duplicate.config.email || duplicate.config.name}". Update cookies on that card instead.`
+        );
       }
     }
 
-    let localCookies: RawCookiesJson = {};
-    try {
-      const stored = localStorage.getItem('unlucid_imported_cookies');
-      if (stored) {
-        localCookies = JSON.parse(stored);
+    const cookieEmail = normalizeEmail(newCookiesRecord.gmail || newCookiesRecord.email);
+    if (cookieEmail) {
+      const existing = profiles.find(
+        (p) =>
+          normalizeEmail(p.config.email) === cookieEmail ||
+          normalizeEmail(p.config.cookies.gmail) === cookieEmail ||
+          normalizeEmail(p.data?.email) === cookieEmail
+      );
+      if (existing) {
+        throw new Error(
+          `Gmail ${cookieEmail} is already on the dashboard. Open that card and update cookies only.`
+        );
       }
-    } catch (e) {
-      console.error('Failed to parse local cookies', e);
     }
 
-    // Unmark from deleted accounts
-    try {
-      const deletedRaw = localStorage.getItem('unlucid_deleted_accounts');
-      if (deletedRaw) {
-        let deletedList: string[] = JSON.parse(deletedRaw);
-        deletedList = deletedList.filter(d => d !== trimmedName);
-        localStorage.setItem('unlucid_deleted_accounts', JSON.stringify(deletedList));
-      }
-    } catch (e) {}
+    const created = createLocalAccount(trimmedName, newCookiesRecord);
+    unmarkDeleted(created.id);
+    if (created.email) unmarkDeleted(created.email);
+    upsertAccount(created);
 
-    localCookies[trimmedName] = newCookiesRecord;
-    localStorage.setItem('unlucid_imported_cookies', JSON.stringify(localCookies));
+    const newProfile = storedToProfile(created);
+    setProfiles((prev) => [newProfile, ...prev]);
 
-    const newProfile: ProfileState = {
-      id: trimmedName,
-      config: {
-        name: trimmedName,
-        cookies: newCookiesRecord
-      },
-      data: null,
-      status: 'loading'
-    };
-
-    setProfiles(prev => [newProfile, ...prev]);
-
-    await fetchAccountData(trimmedName, newCookiesRecord);
+    await fetchAccountData(created.id, created.cookies);
   };
 
   const getImportedCookiesForModal = () => {
-      try {
-          const localCookies = localStorage.getItem('unlucid_imported_cookies');
-          if (localCookies) {
-              const parsed = JSON.parse(localCookies);
-              return Object.entries(parsed).map(([name, cookies]: [string, any]) => ({
-                  name,
-                  token: typeof cookies === 'string' ? cookies : getPrimaryToken(cookies)
-              }));
-          }
-      } catch (e) {}
-      return [];
+    return profiles.map((p) => ({
+      name: p.config.email || p.config.name,
+      token: getPrimaryToken(p.config.cookies),
+    }));
   };
 
   const handleExportCookies = () => {
     const exportData: RawCookiesJson = {};
-    profiles.forEach(p => {
-        exportData[p.config.name] = p.config.cookies;
+    profiles.forEach((p) => {
+      const key = p.config.email || p.id || p.config.name;
+      exportData[key] = p.config.cookies;
     });
 
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
@@ -431,33 +280,30 @@ function App() {
     downloadAnchorNode.remove();
   };
 
-  const handleLoadCookies = async (data: RawCookiesJson) => {
-    const newProfiles: ProfileState[] = Object.entries(data).map(([key, cookies]) => ({
-      id: key,
-      config: { name: key, cookies },
-      data: null,
-      status: 'loading'
-    }));
+  const handleLoadAccounts = async (accounts: StoredAccount[]) => {
+    const newProfiles = accounts.map(storedToProfile);
     setProfiles(newProfiles);
 
     try {
       const results = await apiBatchFetch(
-        newProfiles.map(p => ({ id: p.id, cookies: p.config.cookies }))
+        newProfiles.map((p) => ({ id: p.id, cookies: p.config.cookies }))
       );
       results.forEach((r) => {
         if (r.ok && r.data) {
-          const profile = newProfiles.find(p => p.id === r.id);
+          const profile = newProfiles.find((p) => p.id === r.id);
           applyNormalizedAccount(r.id, { ...(profile?.config.cookies || {}) }, r.data);
         } else {
-          setProfiles(prev => prev.map(p => p.id === r.id ? {
-            ...p,
-            status: 'error',
-            message: r.message || 'Failed to load',
-          } : p));
+          setProfiles((prev) =>
+            prev.map((p) =>
+              p.id === r.id
+                ? { ...p, status: 'error', message: r.message || 'Failed to load' }
+                : p
+            )
+          );
         }
       });
     } catch {
-      await Promise.all(newProfiles.map(p => fetchAccountData(p.id, p.config.cookies)));
+      await Promise.all(newProfiles.map((p) => fetchAccountData(p.id, p.config.cookies)));
     }
 
     setAccountsReady(true);
@@ -468,93 +314,148 @@ function App() {
     currentCookies: Record<string, string>,
     normalizedData: UserData
   ) => {
-    const profile = profilesRef.current.find(p => p.id === id);
-    const resolvedName = normalizedData.name || profile?.config.name || id;
-    const resolvedEmail = normalizedData.email || currentCookies['gmail'] || '';
+    const profile = profilesRef.current.find((p) => p.id === id);
+    if (!profile) return;
 
-    if (resolvedEmail && currentCookies['gmail'] !== resolvedEmail) {
-      currentCookies['gmail'] = resolvedEmail;
-    }
-    if (resolvedName && currentCookies['name'] !== resolvedName) {
-      currentCookies['name'] = resolvedName;
-    }
+    const resolvedName = normalizedData.name || profile.config.name || id;
+    const resolvedEmail =
+      normalizeEmail(normalizedData.email) ||
+      normalizeEmail(profile.config.email) ||
+      normalizeEmail(currentCookies.gmail);
 
     // Prefer persisted manual timer override when still in the future
     try {
       const timersStr = localStorage.getItem('unlucid_account_timers');
       if (timersStr) {
         const timersMap = JSON.parse(timersStr);
-        if (timersMap[id] && timersMap[id] > Date.now() && !normalizedData.canClaimFreeGems) {
+        const timerKey = resolvedEmail || id;
+        const override = timersMap[id] || timersMap[timerKey];
+        if (override && override > Date.now() && !normalizedData.canClaimFreeGems) {
           normalizedData = {
             ...normalizedData,
-            nextFreeGemsAt: timersMap[id],
+            nextFreeGemsAt: override,
             canClaimFreeGems: false,
           };
         }
       }
     } catch (e) {}
 
-    const isGeneric = /^account \d+$/i.test(profile?.config.name || '') || /^account \d+$/i.test(id);
-    const finalConfigName = isGeneric && resolvedName ? resolvedName : (profile?.config.name || id);
+    // Same Gmail already on another card → merge cookies into that card, drop the temp one
+    if (resolvedEmail) {
+      const existingDuplicate = profilesRef.current.find((p) => {
+        if (p.id === id) return false;
+        return (
+          normalizeEmail(p.config.email) === resolvedEmail ||
+          normalizeEmail(p.config.cookies.gmail) === resolvedEmail ||
+          normalizeEmail(p.data?.email) === resolvedEmail
+        );
+      });
 
-    try {
-      const stored = localStorage.getItem('unlucid_imported_cookies');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        const targetKey = parsed[id] ? id : Object.keys(parsed).find(k => k === id || k.toLowerCase() === id.toLowerCase());
-        if (targetKey && parsed[targetKey]) {
-          const savedCookies = { ...parsed[targetKey], ...currentCookies };
-          if (isGeneric && resolvedName && resolvedName !== targetKey) {
-            delete parsed[targetKey];
-            parsed[resolvedName] = savedCookies;
-          } else {
-            parsed[targetKey] = savedCookies;
-          }
-          localStorage.setItem('unlucid_imported_cookies', JSON.stringify(parsed));
-        }
+      if (existingDuplicate) {
+        const mergedCookies = updateAccountCookiesOnly(
+          {
+            id: existingDuplicate.id,
+            label: existingDuplicate.config.name,
+            email: resolvedEmail,
+            cookies: existingDuplicate.config.cookies,
+            source: 'local',
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          },
+          currentCookies
+        );
+        const locked = lockAccountIdentity(mergedCookies, resolvedEmail, resolvedName);
+        upsertAccount(locked);
+        removeAccount(id);
+
+        setCustomOrder((prev) => {
+          const next = prev.filter((oid) => oid !== id);
+          localStorage.setItem('unlucid_custom_order', JSON.stringify(next));
+          return next;
+        });
+
+        setProfiles((prev) =>
+          prev
+            .filter((p) => p.id !== id)
+            .map((p) =>
+              p.id === existingDuplicate.id
+                ? {
+                    ...p,
+                    status: 'idle',
+                    message: undefined,
+                    config: {
+                      name: locked.label,
+                      email: locked.email,
+                      cookies: locked.cookies,
+                    },
+                    data: normalizedData,
+                    lastUpdated: Date.now(),
+                  }
+                : p
+            )
+        );
+        return;
       }
-    } catch (e) {}
+    }
 
-    const currentToken = getPrimaryToken(currentCookies);
-    const existingDuplicate = profilesRef.current.find(p => {
-      if (p.id === id) return false;
-      if (currentToken && getPrimaryToken(p.config.cookies) === currentToken) return true;
-      if (normalizedData.id && p.data?.id && p.data.id === normalizedData.id) return true;
-      if (normalizedData.email && p.data?.email && p.data.email.toLowerCase() === normalizedData.email.toLowerCase()) return true;
-      return false;
-    });
+    const base: StoredAccount = {
+      id: profile.id,
+      label: profile.config.name,
+      email: profile.config.email || normalizeEmail(profile.config.cookies.gmail),
+      cookies: currentCookies,
+      source: 'local',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    const locked = lockAccountIdentity(base, resolvedEmail, resolvedName);
+    const previousId = id;
 
-    if (existingDuplicate) {
-      console.warn(`Duplicate account detected for "${id}" matching existing "${existingDuplicate.id}". Pruning duplicate card.`);
-      setProfiles(prev => prev.filter(p => p.id !== id));
+    // Persist under stable id (may promote acc_* → email once)
+    if (locked.id !== previousId) {
+      removeAccount(previousId);
+      unmarkDeleted(locked.id);
+    }
+    upsertAccount(locked);
+
+    // Migrate timer + custom order keys if id promoted to gmail
+    if (locked.id !== previousId) {
       try {
-        const stored = localStorage.getItem('unlucid_imported_cookies');
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (parsed[id]) {
-            delete parsed[id];
-            localStorage.setItem('unlucid_imported_cookies', JSON.stringify(parsed));
+        const timersStr = localStorage.getItem('unlucid_account_timers');
+        if (timersStr) {
+          const timersMap = JSON.parse(timersStr);
+          if (timersMap[previousId] && !timersMap[locked.id]) {
+            timersMap[locked.id] = timersMap[previousId];
+            delete timersMap[previousId];
+            localStorage.setItem('unlucid_account_timers', JSON.stringify(timersMap));
           }
         }
       } catch (e) {}
-      return;
+
+      setCustomOrder((prev) => {
+        const next = prev.map((oid) => (oid === previousId ? locked.id : oid));
+        localStorage.setItem('unlucid_custom_order', JSON.stringify(next));
+        return next;
+      });
     }
 
-    setProfiles(prev => prev.map(p => {
-      if (p.id !== id) return p;
-      return {
-        ...p,
-        status: 'idle',
-        message: undefined,
-        config: {
-          ...p.config,
-          name: finalConfigName,
-          cookies: currentCookies,
-        },
-        data: normalizedData,
-        lastUpdated: Date.now(),
-      };
-    }));
+    setProfiles((prev) =>
+      prev.map((p) => {
+        if (p.id !== previousId) return p;
+        return {
+          ...p,
+          id: locked.id,
+          status: 'idle',
+          message: undefined,
+          config: {
+            name: locked.label,
+            email: locked.email,
+            cookies: locked.cookies,
+          },
+          data: normalizedData,
+          lastUpdated: Date.now(),
+        };
+      })
+    );
   };
 
   const fetchAccountData = async (id: string, cookies?: Record<string, string>) => {

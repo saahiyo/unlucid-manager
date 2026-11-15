@@ -43,10 +43,13 @@ export interface AccountResponse {
 
 export interface ProfileConfig {
   name: string;
+  /** Locked Gmail / email identity once known */
+  email?: string;
   cookies: Record<string, string>;
 }
 
 export interface ProfileState {
+  /** Stable id — prefer email; never rename away once locked */
   id: string;
   config: ProfileConfig;
   data: UserData | null;
