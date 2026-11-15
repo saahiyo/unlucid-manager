@@ -2,15 +2,16 @@ import {
   authorizeCronRequest,
   handleOptions,
   jsonResponse,
-  loadCronAccountsFromEnv,
   runAutoClaim,
   toWebResponse,
 } from '../../server/unlucid-proxy';
+import { loadCronAccounts } from '../../server/remote-accounts';
 
 export const config = { runtime: 'edge' };
 
 /**
  * Server-side auto-claim for Vercel Cron (and manual triggers).
+ * Prefers dashboard-synced remote store, then env cookies.
  * GET or POST with Authorization: Bearer <CRON_SECRET>
  */
 export default async function handler(req: Request): Promise<Response> {
@@ -38,14 +39,16 @@ export default async function handler(req: Request): Promise<Response> {
   }
 
   try {
-    const accounts = loadCronAccountsFromEnv();
+    const { accounts, source } = await loadCronAccounts();
     if (accounts.length === 0) {
       return toWebResponse(
         jsonResponse(
           {
             ok: false,
             code: 'INVALID_REQUEST',
-            message: 'No accounts in UNLUCID_COOKIES or VITE_COOKIES',
+            message:
+              'No accounts in remote store or env. Update cookies in the dashboard (with sync configured) or set UNLUCID_COOKIES.',
+            source,
             claimed: 0,
             skipped: 0,
             failed: 0,
@@ -59,7 +62,7 @@ export default async function handler(req: Request): Promise<Response> {
     }
 
     const summary = await runAutoClaim(accounts);
-    return toWebResponse(jsonResponse(summary, 200, origin));
+    return toWebResponse(jsonResponse({ ...summary, source }, 200, origin));
   } catch (err) {
     return toWebResponse(
       jsonResponse(

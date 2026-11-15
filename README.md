@@ -38,14 +38,16 @@ A modern, high-performance dashboard for managing multiple Unlucid accounts, tra
     ```
     Open `.env` and paste your cookies JSON string into `VITE_COOKIES`.
 
-    **On Vercel:**
-    Go to your project settings > Environment Variables and add:
-    - `VITE_COOKIES` — cookies JSON for the dashboard (e.g. `{"my_account": {...}}`)
-    - `UNLUCID_COOKIES` — same JSON for **server auto-claim** (recommended; falls back to `VITE_COOKIES`)
-    - `CRON_SECRET` — long random string; Vercel Cron sends it as `Authorization: Bearer …`
+    **On Vercel (set once):**
+    1. Add **Upstash Redis** from the Vercel Storage / Marketplace (auto-sets `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN`).
+    2. Environment variables:
+       - `CRON_SECRET` — long random string (cron auth)
+       - `VITE_SYNC_SECRET` — **same value** as `CRON_SECRET` (dashboard sync auth)
+       - Optional: `VITE_COOKIES` / `UNLUCID_COOKIES` only as a bootstrap fallback
 
-    > **Note:** The JSON string must be valid. You can minify it to a single line.
-    > Browser-imported accounts in localStorage are **not** claimed by cron — only env accounts are.
+    After that, **Update cookies** in the UI writes to Redis. Daily cron reads Redis — you do not re-edit env when a session expires.
+
+    > `VITE_SYNC_SECRET` is visible in the client bundle; fine for a private personal deploy, not for a public multi-user app.
 
 ## Usage
 
@@ -68,20 +70,23 @@ This app ships with an **owned Unlucid proxy** under `/api`:
 | `POST /api/claim` | Claim daily free gems |
 | `POST /api/batch` | Sync many accounts: `{ accounts: [{ id, cookies }] }` |
 | `GET/POST /api/cron/auto-claim` | Server auto-claim (cron / manual); requires `CRON_SECRET` |
+| `GET/POST /api/accounts` | Sync account cookies to Redis for cron; requires `SYNC_SECRET`/`CRON_SECRET` |
 
-Locally, Vite middleware serves these routes. On Vercel, the functions in `/api` deploy automatically. Optional `VITE_API_BASE` points at a separately hosted proxy.
+Locally, Vite middleware serves these routes (cookies sync to `.data/remote-accounts.json` if Upstash is unset). On Vercel, `/api` deploys automatically. Optional `VITE_API_BASE` points at a separately hosted proxy.
 
 ### Server auto-claim
 
 `vercel.json` schedules `/api/cron/auto-claim` daily at 08:00 UTC (`0 8 * * *`) for Vercel Hobby. On Pro you can use hourly (`0 * * * *`).
 
-Manual test (local or production):
+Cron loads accounts from **Upstash Redis** (synced by the dashboard). If Redis is empty, it falls back to `UNLUCID_COOKIES` / `VITE_COOKIES`.
+
+Manual test:
 
 ```bash
 curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/auto-claim
 ```
 
-Response includes `claimed`, `skipped`, `failed`, and per-account `results`.
+Response includes `claimed`, `skipped`, `failed`, `source` (`remote`|`env`), and per-account `results`.
 
 Normalized response shape:
 

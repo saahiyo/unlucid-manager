@@ -1,6 +1,13 @@
-import { URL_ACCOUNT, URL_CLAIM, URL_BOTH, URL_BATCH } from '../config';
+import { SYNC_SECRET, URL_ACCOUNT, URL_ACCOUNTS, URL_CLAIM, URL_BOTH, URL_BATCH } from '../config';
 import type { UserData } from '../types';
 import type { AccountResult, ClaimResult, NormalizedProfile, ProxyErrorCode } from '../server/unlucid-proxy';
+
+export interface SyncAccountPayload {
+  id: string;
+  email?: string;
+  label?: string;
+  cookies: Record<string, string>;
+}
 
 export type { AccountResult, ClaimResult, NormalizedProfile, ProxyErrorCode };
 
@@ -154,4 +161,51 @@ export async function apiBatchFetch(
       })
     );
   }
+}
+
+async function postAccountsSync<T>(body: unknown): Promise<T | null> {
+  if (!SYNC_SECRET) return null;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20000);
+  try {
+    const res = await fetch(URL_ACCOUNTS, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${SYNC_SECRET}`,
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      console.warn('Account sync failed:', data?.message || res.status);
+      return null;
+    }
+    return data as T;
+  } catch (err) {
+    console.warn('Account sync error:', err);
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+/** Push one account's cookies to the server store used by cron */
+export async function apiSyncUpsertAccount(account: SyncAccountPayload): Promise<boolean> {
+  const result = await postAccountsSync<{ ok?: boolean }>({ op: 'upsert', account });
+  return Boolean(result?.ok);
+}
+
+/** Remove an account from the server cron store */
+export async function apiSyncDeleteAccount(id: string): Promise<boolean> {
+  const result = await postAccountsSync<{ ok?: boolean }>({ op: 'delete', id });
+  return Boolean(result?.ok);
+}
+
+/** Replace the full remote store (initial migration / import) */
+export async function apiSyncReplaceAccounts(accounts: SyncAccountPayload[]): Promise<boolean> {
+  const result = await postAccountsSync<{ ok?: boolean }>({ op: 'replace', accounts });
+  return Boolean(result?.ok);
 }

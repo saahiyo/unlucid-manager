@@ -10,7 +10,15 @@ import { CookieImportModal } from './components/CookieImportModal';
 import { AddAccountModal } from './components/AddAccountModal';
 import { SortableAccountCard } from './components/SortableAccountCard';
 import { parseCookiesInput, getPrimaryToken } from './cookieUtils';
-import { apiBatchFetch, apiClaimGems, apiFetchAccount } from './lib/api';
+import {
+  apiBatchFetch,
+  apiClaimGems,
+  apiFetchAccount,
+  apiSyncDeleteAccount,
+  apiSyncReplaceAccounts,
+  apiSyncUpsertAccount,
+} from './lib/api';
+import { SYNC_SECRET } from './config';
 import {
   createLocalAccount,
   loadMergedAccounts,
@@ -108,6 +116,20 @@ function App() {
     status: 'loading',
   });
 
+  const pushAccountToServer = (account: {
+    id: string;
+    email?: string;
+    label?: string;
+    cookies: Record<string, string>;
+  }) => {
+    void apiSyncUpsertAccount({
+      id: account.id,
+      email: account.email,
+      label: account.label,
+      cookies: account.cookies,
+    });
+  };
+
   // Initialize from stable account registry (+ env / legacy migrate)
   useEffect(() => {
     const accounts = loadMergedAccounts(import.meta.env.VITE_COOKIES as string | undefined);
@@ -117,6 +139,19 @@ function App() {
       setAccountsReady(true);
     }
   }, []);
+
+  // Push local registry to server once ready (cron reads this store)
+  useEffect(() => {
+    if (!accountsReady || !SYNC_SECRET || profiles.length === 0) return;
+    void apiSyncReplaceAccounts(
+      profiles.map((p) => ({
+        id: p.id,
+        email: p.config.email || normalizeEmail(p.config.cookies.gmail),
+        label: p.config.name,
+        cookies: p.config.cookies,
+      }))
+    );
+  }, [accountsReady]); // eslint-disable-line react-hooks/exhaustive-deps -- one-shot after initial load
 
   const handleSaveImportedCookies = (importedAccounts: { name: string; token: string }[]) => {
     const seenTokens = new Set<string>();
@@ -131,6 +166,7 @@ function App() {
       unmarkDeleted(created.id);
       if (created.email) unmarkDeleted(created.email);
       upsertAccount(created);
+      pushAccountToServer(created);
     });
 
     const accounts = loadMergedAccounts(import.meta.env.VITE_COOKIES as string | undefined);
@@ -159,6 +195,7 @@ function App() {
     unmarkDeleted(updated.id);
     if (updated.email) unmarkDeleted(updated.email);
     upsertAccount(updated);
+    pushAccountToServer(updated);
 
     setProfiles((prev) =>
       prev.map((p) =>
@@ -187,6 +224,8 @@ function App() {
     if (email && email !== id) {
       removeAccount(email);
     }
+    void apiSyncDeleteAccount(id);
+    if (email && email !== id) void apiSyncDeleteAccount(email);
     setProfiles((prev) => prev.filter((p) => p.id !== id && p.id !== email));
   };
 
@@ -250,6 +289,7 @@ function App() {
     unmarkDeleted(created.id);
     if (created.email) unmarkDeleted(created.email);
     upsertAccount(created);
+    pushAccountToServer(created);
 
     const newProfile = storedToProfile(created);
     setProfiles((prev) => [newProfile, ...prev]);
@@ -367,6 +407,8 @@ function App() {
         const locked = lockAccountIdentity(mergedCookies, resolvedEmail, resolvedName);
         upsertAccount(locked);
         removeAccount(id);
+        pushAccountToServer(locked);
+        if (id !== locked.id) void apiSyncDeleteAccount(id);
 
         setCustomOrder((prev) => {
           const next = prev.filter((oid) => oid !== id);
@@ -414,8 +456,10 @@ function App() {
     if (locked.id !== previousId) {
       removeAccount(previousId);
       unmarkDeleted(locked.id);
+      void apiSyncDeleteAccount(previousId);
     }
     upsertAccount(locked);
+    pushAccountToServer(locked);
 
     // Migrate timer + custom order keys if id promoted to gmail
     if (locked.id !== previousId) {

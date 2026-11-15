@@ -8,3 +8,10 @@ export const URL_ACCOUNT = `${API_BASE}/api/account`;
 export const URL_CLAIM = `${API_BASE}/api/claim`;
 export const URL_BOTH = `${API_BASE}/api/both`;
 export const URL_BATCH = `${API_BASE}/api/batch`;
+export const URL_ACCOUNTS = `${API_BASE}/api/accounts`;
+
+/** Same value as server SYNC_SECRET or CRON_SECRET — personal deploy only */
+export const SYNC_SECRET =
+  (import.meta.env.VITE_SYNC_SECRET as string | undefined) ||
+  (import.meta.env.VITE_CRON_SECRET as string | undefined) ||
+  '';

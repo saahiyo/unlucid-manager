@@ -6,9 +6,16 @@ import {
   fetchAccount,
   handleOptions,
   jsonResponse,
-  loadCronAccountsFromEnv,
   runAutoClaim,
 } from './unlucid-proxy';
+import {
+  authorizeSyncRequest,
+  deleteRemoteAccount,
+  loadCronAccounts,
+  readRemoteAccounts,
+  replaceRemoteAccounts,
+  upsertRemoteAccount,
+} from './remote-accounts';
 
 function send(
   res: any,
@@ -100,6 +107,103 @@ export function unlucidApiPlugin(): Plugin {
             return send(res, jsonResponse({ ok: true, ...result }, 200, origin));
           }
 
+          if (url === '/api/accounts') {
+            const host = req.headers.host || 'localhost';
+            const proto = host.includes('localhost') ? 'http' : 'https';
+            const authReq = new Request(`${proto}://${host}${req.url}`, {
+              method: req.method,
+              headers: req.headers as HeadersInit,
+            });
+            const auth = authorizeSyncRequest(authReq);
+            if (auth.ok === false) {
+              return send(
+                res,
+                jsonResponse(
+                  {
+                    ok: false,
+                    code: auth.status === 401 ? 'INVALID_REQUEST' : 'ERROR',
+                    message: auth.message,
+                  },
+                  auth.status,
+                  origin
+                )
+              );
+            }
+
+            if (req.method === 'GET') {
+              const map = await readRemoteAccounts();
+              return send(
+                res,
+                jsonResponse({ ok: true, accounts: Object.values(map), count: Object.keys(map).length }, 200, origin)
+              );
+            }
+
+            if (req.method !== 'POST') {
+              return send(
+                res,
+                jsonResponse({ ok: false, code: 'INVALID_REQUEST', message: 'GET or POST only' }, 405, origin)
+              );
+            }
+
+            const body = await readJsonBody(req);
+            const op = String(body?.op || 'list');
+
+            if (op === 'list') {
+              const map = await readRemoteAccounts();
+              return send(
+                res,
+                jsonResponse({ ok: true, accounts: Object.values(map), count: Object.keys(map).length }, 200, origin)
+              );
+            }
+
+            if (op === 'upsert') {
+              const account = body?.account;
+              if (!account?.id || !account?.cookies) {
+                return send(
+                  res,
+                  jsonResponse(
+                    { ok: false, code: 'INVALID_REQUEST', message: 'account.id and account.cookies required' },
+                    400,
+                    origin
+                  )
+                );
+              }
+              const saved = await upsertRemoteAccount({
+                id: String(account.id),
+                email: account.email ? String(account.email) : undefined,
+                label: account.label ? String(account.label) : undefined,
+                cookies: account.cookies,
+              });
+              return send(res, jsonResponse({ ok: true, account: saved }, 200, origin));
+            }
+
+            if (op === 'delete') {
+              const id = String(body?.id || '');
+              if (!id) {
+                return send(
+                  res,
+                  jsonResponse({ ok: false, code: 'INVALID_REQUEST', message: 'id required' }, 400, origin)
+                );
+              }
+              const removed = await deleteRemoteAccount(id);
+              return send(res, jsonResponse({ ok: true, removed }, 200, origin));
+            }
+
+            if (op === 'replace') {
+              const accounts = Array.isArray(body?.accounts) ? body.accounts : [];
+              const saved = await replaceRemoteAccounts(accounts);
+              return send(
+                res,
+                jsonResponse({ ok: true, accounts: saved, count: saved.length }, 200, origin)
+              );
+            }
+
+            return send(
+              res,
+              jsonResponse({ ok: false, code: 'INVALID_REQUEST', message: `Unknown op: ${op}` }, 400, origin)
+            );
+          }
+
           if (url === '/api/cron/auto-claim') {
             if (req.method !== 'GET' && req.method !== 'POST') {
               return send(
@@ -130,7 +234,7 @@ export function unlucidApiPlugin(): Plugin {
               );
             }
 
-            const accounts = loadCronAccountsFromEnv();
+            const { accounts, source } = await loadCronAccounts();
             if (accounts.length === 0) {
               return send(
                 res,
@@ -138,7 +242,9 @@ export function unlucidApiPlugin(): Plugin {
                   {
                     ok: false,
                     code: 'INVALID_REQUEST',
-                    message: 'No accounts in UNLUCID_COOKIES or VITE_COOKIES',
+                    message:
+                      'No accounts in remote store or env. Sync from the dashboard or set UNLUCID_COOKIES.',
+                    source,
                     claimed: 0,
                     skipped: 0,
                     failed: 0,
@@ -152,7 +258,7 @@ export function unlucidApiPlugin(): Plugin {
             }
 
             const summary = await runAutoClaim(accounts);
-            return send(res, jsonResponse(summary, 200, origin));
+            return send(res, jsonResponse({ ...summary, source }, 200, origin));
           }
 
           return next();
