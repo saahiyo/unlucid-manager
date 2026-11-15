@@ -777,31 +777,30 @@ function App() {
       <div className="relative z-10 mx-auto w-full max-w-6xl px-3 sm:px-6">
 
       {/* Header */}
-      <header className="sticky top-2 sm:top-4 z-40 pt-0.5 sm:pt-1">
-        <div className="bg-white/60 dark:bg-[#121214]/75 backdrop-blur-2xl border border-zinc-300/60 dark:border-white/10 rounded-xl sm:rounded-2xl flex items-center justify-between gap-2 sm:gap-3 px-2.5 sm:px-5 h-11 sm:h-16 transition-colors duration-300">
+      <header className="sticky top-3 sm:top-4 z-40 pt-1">
+        <div className="bg-white/60 dark:bg-[#121214]/75 backdrop-blur-2xl border border-zinc-300/60 dark:border-white/10 rounded-2xl flex items-center justify-between gap-3 px-3.5 sm:px-5 h-14 sm:h-16 transition-colors duration-300">
             
             {/* Logo Area */}
-            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                <div className="w-7 h-7 sm:w-8 sm:h-8 bg-emerald-500 rounded-md sm:rounded-lg flex items-center justify-center shrink-0">
-                    <Diamond size={13} className="text-black fill-current sm:hidden" />
-                    <Diamond size={15} className="text-black fill-current hidden sm:block" />
+            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center shrink-0">
+                    <Diamond size={15} className="text-black fill-current" />
                 </div>
                 <div className="min-w-0">
-                    <h1 className="text-[13px] sm:text-sm font-semibold tracking-tight text-zinc-900 dark:text-white leading-none truncate">Unlucid<span className="text-zinc-400 dark:text-zinc-500 font-medium ml-1 hidden min-[360px]:inline">Manager</span></h1>
-                    <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono tracking-wide mt-0.5 hidden sm:block">v2.0</p>
+                    <h1 className="text-sm font-semibold tracking-tight text-zinc-900 dark:text-white leading-none truncate">Unlucid<span className="text-zinc-400 dark:text-zinc-500 font-medium ml-1">Manager</span></h1>
+                    <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono tracking-wide mt-0.5 hidden min-[380px]:block">v2.0</p>
                 </div>
             </div>
 
             {/* Stats & Controls */}
-            <div className="flex items-center gap-1.5 sm:gap-4 shrink-0">
-                <div className="flex items-center gap-1.5 sm:gap-3 bg-zinc-200/70 dark:bg-black/20 px-2 sm:px-4 py-1 sm:py-1.5 rounded-md sm:rounded-lg border border-zinc-300/80 dark:border-white/5">
-                    <div className="flex items-center gap-1 sm:gap-2 border-r border-zinc-200 dark:border-white/10 pr-1.5 sm:pr-3">
-                        <span className="text-[8px] sm:text-[10px] text-zinc-500 uppercase font-bold">Total</span>
-                        <span className="text-[11px] sm:text-sm font-mono font-bold text-zinc-700 dark:text-zinc-200">{totalGems.toLocaleString()}</span>
+            <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+                <div className="flex items-center gap-2.5 sm:gap-3 bg-zinc-200/70 dark:bg-black/20 px-2.5 sm:px-4 py-1.5 rounded-lg border border-zinc-300/80 dark:border-white/5">
+                    <div className="flex items-center gap-1.5 sm:gap-2 border-r border-zinc-200 dark:border-white/10 pr-2.5 sm:pr-3">
+                        <span className="text-[9px] sm:text-[10px] text-zinc-500 uppercase font-bold">Total</span>
+                        <span className="text-xs sm:text-sm font-mono font-bold text-zinc-700 dark:text-zinc-200">{totalGems.toLocaleString()}</span>
                     </div>
-                    <div className="flex items-center gap-1 sm:gap-2">
-                        <span className="text-[8px] sm:text-[10px] text-zinc-500 uppercase font-bold">Ready</span>
-                        <span className={`text-[11px] sm:text-sm font-mono font-bold ${readyToClaim > 0 ? 'text-emerald-400' : 'text-zinc-500'}`}>{readyToClaim}</span>
+                    <div className="flex items-center gap-1.5 sm:gap-2">
+                        <span className="text-[9px] sm:text-[10px] text-zinc-500 uppercase font-bold">Ready</span>
+                        <span className={`text-xs sm:text-sm font-mono font-bold ${readyToClaim > 0 ? 'text-emerald-400' : 'text-zinc-500'}`}>{readyToClaim}</span>
                     </div>
                 </div>
                 
