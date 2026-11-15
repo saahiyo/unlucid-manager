@@ -3,7 +3,7 @@ import { ProfileState, RawCookiesJson, UserData } from './types';
 import { ThemeProvider } from './components/ThemeProvider';
 import { ThemeToggle } from './components/ThemeToggle';
 
-import { Diamond, Layers, RefreshCw, Zap, Import, Download, Sparkles, Volume2, VolumeX, Plus, ArrowUpDown, AlertTriangle, MoreHorizontal } from 'lucide-react';
+import { Diamond, Layers, RefreshCw, Zap, Import, Download, Sparkles, Plus, ArrowUpDown, AlertTriangle, MoreHorizontal } from 'lucide-react';
 
 import { Preloader } from './components/Preloader';
 import { CookieImportModal } from './components/CookieImportModal';
@@ -62,18 +62,8 @@ function App() {
     useSensor(KeyboardSensor)
   );
 
-  // Hands-free Auto-Claimer State
-  const [autoClaimEnabled, setAutoClaimEnabled] = useState(() => {
-    return localStorage.getItem('unlucid_auto_claim') === 'true';
-  });
-  const [soundEnabled, setSoundEnabled] = useState(() => {
-    return localStorage.getItem('unlucid_sound_enabled') !== 'false';
-  });
-  const [autoClaimCount, setAutoClaimCount] = useState<number>(0);
-
   const profilesRef = useRef(profiles);
   profilesRef.current = profiles;
-  const isAutoClaimingRef = useRef(false);
 
   // Close More menu on outside click / Escape
   useEffect(() => {
@@ -591,41 +581,6 @@ function App() {
     }
   };
 
-  const playChime = () => {
-    try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      if (!AudioCtx) return;
-      const ctx = new AudioCtx();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(587.33, ctx.currentTime);
-      osc.frequency.setValueAtTime(880, ctx.currentTime + 0.08);
-
-      gain.gain.setValueAtTime(0.12, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
-
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-
-      osc.start();
-      osc.stop(ctx.currentTime + 0.35);
-    } catch (e) {
-      // Audio might be blocked if page hasn't had user interaction
-    }
-  };
-
-  const toggleAutoClaim = () => {
-    const nextState = !autoClaimEnabled;
-    setAutoClaimEnabled(nextState);
-    localStorage.setItem('unlucid_auto_claim', String(nextState));
-
-    if (nextState && typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission().catch(() => {});
-    }
-  };
-
   const claimGems = async (id: string): Promise<boolean> => {
     setProfiles(prev => prev.map(p => p.id === id ? { ...p, status: 'claiming', message: undefined } : p));
 
@@ -707,53 +662,6 @@ function App() {
       localStorage.setItem('unlucid_account_timers', JSON.stringify(timersMap));
     } catch (e) {}
   };
-
-  // Hands-free Auto-Claimer Interval Loop
-  useEffect(() => {
-    if (!autoClaimEnabled) return;
-
-    const interval = setInterval(async () => {
-      if (isAutoClaimingRef.current || globalLoading) return;
-
-      const now = Date.now();
-      const currentProfiles = profilesRef.current;
-      const eligible = currentProfiles.filter(p => {
-        return (
-          p.data &&
-          (p.data.canClaimFreeGems || (p.data.nextFreeGemsAt && p.data.nextFreeGemsAt <= now)) &&
-          p.status !== 'claiming' &&
-          p.status !== 'loading'
-        );
-      });
-
-      if (eligible.length > 0) {
-        isAutoClaimingRef.current = true;
-        try {
-          const results = await Promise.all(eligible.map(p => claimGems(p.id)));
-          const claimedCount = results.filter(Boolean).length;
-          if (claimedCount > 0) {
-            if (soundEnabled) playChime();
-            setAutoClaimCount(prev => prev + claimedCount);
-
-            if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-              try {
-                const names = eligible.map(p => p.config.name).join(', ');
-                new Notification('💎 Gems Auto-Claimed!', {
-                  body: `Successfully claimed credits for: ${names}`,
-                });
-              } catch (e) {}
-            }
-          }
-        } catch (err) {
-          console.error("Auto-claim error:", err);
-        } finally {
-          isAutoClaimingRef.current = false;
-        }
-      }
-    }, 3000);
-
-    return () => clearInterval(interval);
-  }, [autoClaimEnabled, globalLoading, soundEnabled]);
 
   const handleClaimAll = async () => {
     setGlobalLoading(true);
@@ -968,12 +876,6 @@ function App() {
               <span className="flex items-center justify-center w-6 h-6 text-[10px] bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 rounded-full border border-zinc-200 dark:border-zinc-700">
                 {profiles.length}
               </span>
-              {autoClaimEnabled && (
-                <span className="ml-1 inline-flex items-center gap-1.5 text-[10px] font-mono font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                  Auto{autoClaimCount > 0 ? ` · ${autoClaimCount}` : ''}
-                </span>
-              )}
             </h2>
 
             <div className="flex items-center overflow-x-auto no-scrollbar max-w-full">
@@ -1043,60 +945,25 @@ function App() {
             </div>
           </div>
 
-          {/* Controls — 2 rows on mobile, one compact row on desktop */}
+          {/* Controls — stacked on mobile, one row on desktop */}
           <div className="flex flex-col gap-2 w-full md:w-auto md:flex-row md:items-center md:gap-2 shrink-0">
-            <div className="grid grid-cols-2 gap-2 md:flex md:items-center md:gap-2">
-              <div className="flex items-center gap-1.5 min-h-10 bg-white/70 dark:bg-zinc-900 border border-zinc-300/80 dark:border-zinc-800 rounded-lg px-2.5 text-xs text-zinc-600 dark:text-zinc-300 shadow-sm dark:shadow-none">
-                <ArrowUpDown size={13} className="text-zinc-400 shrink-0" />
-                <select
-                  value={sortBy}
-                  onChange={(e) => {
-                    const val = e.target.value as SortOption;
-                    setSortBy(val);
-                    localStorage.setItem('unlucid_sort_by', val);
-                  }}
-                  className="w-full md:w-auto bg-transparent border-none text-xs font-semibold text-zinc-800 dark:text-zinc-200 focus:outline-none cursor-pointer"
-                  aria-label="Sort accounts"
-                >
-                  <option value="valid_first" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white">Valid first</option>
-                  <option value="gems" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white">Highest gems</option>
-                  <option value="name" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white">Name A–Z</option>
-                  <option value="custom" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white">Custom</option>
-                </select>
-              </div>
-
-              <div className="flex items-center gap-1.5 min-w-0">
-                <button 
-                  onClick={toggleAutoClaim}
-                  className={`flex-1 md:flex-none min-h-10 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 border shadow-sm ${
-                    autoClaimEnabled
-                      ? 'bg-emerald-500/10 dark:bg-emerald-950/40 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 ring-1 ring-emerald-500/30'
-                      : 'bg-white/70 dark:bg-zinc-900 border-zinc-300/80 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400'
-                  }`}
-                  title={autoClaimEnabled ? "Auto-Claim is Active" : "Turn On Auto-Claim"}
-                >
-                  <Sparkles size={13} className={autoClaimEnabled ? "text-emerald-500" : "text-zinc-400"} />
-                  <span>Auto <strong className={autoClaimEnabled ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-500"}>{autoClaimEnabled ? "ON" : "OFF"}</strong></span>
-                </button>
-
-                {autoClaimEnabled && (
-                  <button
-                    onClick={() => {
-                      const next = !soundEnabled;
-                      setSoundEnabled(next);
-                      localStorage.setItem('unlucid_sound_enabled', String(next));
-                    }}
-                    className={`min-h-10 min-w-10 flex items-center justify-center rounded-lg border text-xs transition-colors shrink-0 ${
-                      soundEnabled 
-                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400' 
-                        : 'bg-zinc-100 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-400'
-                    }`}
-                    title={soundEnabled ? "Mute chime" : "Unmute chime"}
-                  >
-                    {soundEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
-                  </button>
-                )}
-              </div>
+            <div className="flex items-center gap-1.5 min-h-10 bg-white/70 dark:bg-zinc-900 border border-zinc-300/80 dark:border-zinc-800 rounded-lg px-2.5 text-xs text-zinc-600 dark:text-zinc-300 shadow-sm dark:shadow-none">
+              <ArrowUpDown size={13} className="text-zinc-400 shrink-0" />
+              <select
+                value={sortBy}
+                onChange={(e) => {
+                  const val = e.target.value as SortOption;
+                  setSortBy(val);
+                  localStorage.setItem('unlucid_sort_by', val);
+                }}
+                className="w-full md:w-auto bg-transparent border-none text-xs font-semibold text-zinc-800 dark:text-zinc-200 focus:outline-none cursor-pointer"
+                aria-label="Sort accounts"
+              >
+                <option value="valid_first" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white">Valid first</option>
+                <option value="gems" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white">Highest gems</option>
+                <option value="name" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white">Name A–Z</option>
+                <option value="custom" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white">Custom</option>
+              </select>
             </div>
 
             <div className="flex items-center gap-2">

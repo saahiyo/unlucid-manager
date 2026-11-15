@@ -6,7 +6,7 @@ A modern, high-performance dashboard for managing multiple Unlucid accounts, tra
 
 - **Multi-Account Dashboard**: View all your accounts in a sleek, responsive grid or masonry layout.
 - **Real-time Stats**: Track total gems and ready-to-claim status instantly.
-- **Auto-Claim**: Claim gems for individual accounts or all eligible accounts with one click.
+- **Claim**: Claim gems for individual accounts or all eligible accounts with one click.
 - **Drawing Cursor**: Enjoy a smooth, interactive emerald trail effect as you navigate.
 - **Dark/Light Mode**: Fully supported themes with a premium glassmorphism aesthetic.
 - **Secure**: Your tokens are stored locally in your configuration file.
