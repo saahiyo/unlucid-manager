@@ -7,7 +7,7 @@ A modern, high-performance dashboard for managing multiple Unlucid accounts, tra
 - **Multi-Account Dashboard**: View all your accounts in a sleek, responsive grid or masonry layout.
 - **Real-time Stats**: Track total gems and ready-to-claim status instantly.
 - **Claim**: Claim gems for individual accounts or all eligible accounts with one click.
-- **Server Auto-Claim**: Vercel Cron claims ready accounts hourly without keeping a browser tab open.
+- **Server Auto-Claim**: Vercel Cron claims ready accounts daily without keeping a browser tab open.
 - **Dark/Light Mode**: Fully supported themes with a premium glassmorphism aesthetic.
 - **Secure**: Tokens live in env vars; cron is gated by `CRON_SECRET`.
 
@@ -73,7 +73,7 @@ Locally, Vite middleware serves these routes. On Vercel, the functions in `/api`
 
 ### Server auto-claim
 
-`vercel.json` schedules `/api/cron/auto-claim` every hour (`0 * * * *`). On Vercel Hobby, change the schedule to once daily (e.g. `0 8 * * *`).
+`vercel.json` schedules `/api/cron/auto-claim` daily at 08:00 UTC (`0 8 * * *`) for Vercel Hobby. On Pro you can use hourly (`0 * * * *`).
 
 Manual test (local or production):
 
