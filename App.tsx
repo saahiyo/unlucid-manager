@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { ProfileState, RawCookiesJson } from './types';
-import { URL_ACCOUNT, URL_CLAIM, URL_BOTH } from './config';
+import { ProfileState, RawCookiesJson, UserData } from './types';
 import { ThemeProvider } from './components/ThemeProvider';
 import { ThemeToggle } from './components/ThemeToggle';
 
@@ -10,7 +9,8 @@ import { Preloader } from './components/Preloader';
 import { CookieImportModal } from './components/CookieImportModal';
 import { AddAccountModal } from './components/AddAccountModal';
 import { SortableAccountCard } from './components/SortableAccountCard';
-import { parseCookiesInput, getPrimaryToken, extractProfileMetadata, extractClaimData } from './cookieUtils';
+import { parseCookiesInput, getPrimaryToken } from './cookieUtils';
+import { apiBatchFetch, apiClaimGems, apiFetchAccount } from './lib/api';
 
 import {
   DndContext,
@@ -446,211 +446,147 @@ function App() {
       id: key,
       config: { name: key, cookies },
       data: null,
-      status: 'idle'
+      status: 'loading'
     }));
     setProfiles(newProfiles);
-    // Automatically fetch data for new profiles
-    await Promise.all(newProfiles.map(p => fetchAccountData(p.id, p.config.cookies)));
+
+    try {
+      const results = await apiBatchFetch(
+        newProfiles.map(p => ({ id: p.id, cookies: p.config.cookies }))
+      );
+      results.forEach((r) => {
+        if (r.ok && r.data) {
+          const profile = newProfiles.find(p => p.id === r.id);
+          applyNormalizedAccount(r.id, { ...(profile?.config.cookies || {}) }, r.data);
+        } else {
+          setProfiles(prev => prev.map(p => p.id === r.id ? {
+            ...p,
+            status: 'error',
+            message: r.message || 'Failed to load',
+          } : p));
+        }
+      });
+    } catch {
+      await Promise.all(newProfiles.map(p => fetchAccountData(p.id, p.config.cookies)));
+    }
+
     setAccountsReady(true);
+  };
+
+  const applyNormalizedAccount = (
+    id: string,
+    currentCookies: Record<string, string>,
+    normalizedData: UserData
+  ) => {
+    const profile = profilesRef.current.find(p => p.id === id);
+    const resolvedName = normalizedData.name || profile?.config.name || id;
+    const resolvedEmail = normalizedData.email || currentCookies['gmail'] || '';
+
+    if (resolvedEmail && currentCookies['gmail'] !== resolvedEmail) {
+      currentCookies['gmail'] = resolvedEmail;
+    }
+    if (resolvedName && currentCookies['name'] !== resolvedName) {
+      currentCookies['name'] = resolvedName;
+    }
+
+    // Prefer persisted manual timer override when still in the future
+    try {
+      const timersStr = localStorage.getItem('unlucid_account_timers');
+      if (timersStr) {
+        const timersMap = JSON.parse(timersStr);
+        if (timersMap[id] && timersMap[id] > Date.now() && !normalizedData.canClaimFreeGems) {
+          normalizedData = {
+            ...normalizedData,
+            nextFreeGemsAt: timersMap[id],
+            canClaimFreeGems: false,
+          };
+        }
+      }
+    } catch (e) {}
+
+    const isGeneric = /^account \d+$/i.test(profile?.config.name || '') || /^account \d+$/i.test(id);
+    const finalConfigName = isGeneric && resolvedName ? resolvedName : (profile?.config.name || id);
+
+    try {
+      const stored = localStorage.getItem('unlucid_imported_cookies');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        const targetKey = parsed[id] ? id : Object.keys(parsed).find(k => k === id || k.toLowerCase() === id.toLowerCase());
+        if (targetKey && parsed[targetKey]) {
+          const savedCookies = { ...parsed[targetKey], ...currentCookies };
+          if (isGeneric && resolvedName && resolvedName !== targetKey) {
+            delete parsed[targetKey];
+            parsed[resolvedName] = savedCookies;
+          } else {
+            parsed[targetKey] = savedCookies;
+          }
+          localStorage.setItem('unlucid_imported_cookies', JSON.stringify(parsed));
+        }
+      }
+    } catch (e) {}
+
+    const currentToken = getPrimaryToken(currentCookies);
+    const existingDuplicate = profilesRef.current.find(p => {
+      if (p.id === id) return false;
+      if (currentToken && getPrimaryToken(p.config.cookies) === currentToken) return true;
+      if (normalizedData.id && p.data?.id && p.data.id === normalizedData.id) return true;
+      if (normalizedData.email && p.data?.email && p.data.email.toLowerCase() === normalizedData.email.toLowerCase()) return true;
+      return false;
+    });
+
+    if (existingDuplicate) {
+      console.warn(`Duplicate account detected for "${id}" matching existing "${existingDuplicate.id}". Pruning duplicate card.`);
+      setProfiles(prev => prev.filter(p => p.id !== id));
+      try {
+        const stored = localStorage.getItem('unlucid_imported_cookies');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed[id]) {
+            delete parsed[id];
+            localStorage.setItem('unlucid_imported_cookies', JSON.stringify(parsed));
+          }
+        }
+      } catch (e) {}
+      return;
+    }
+
+    setProfiles(prev => prev.map(p => {
+      if (p.id !== id) return p;
+      return {
+        ...p,
+        status: 'idle',
+        message: undefined,
+        config: {
+          ...p.config,
+          name: finalConfigName,
+          cookies: currentCookies,
+        },
+        data: normalizedData,
+        lastUpdated: Date.now(),
+      };
+    }));
   };
 
   const fetchAccountData = async (id: string, cookies?: Record<string, string>) => {
     setProfiles(prev => prev.map(p => p.id === id ? { ...p, status: 'loading', message: undefined } : p));
-    
-    const profile = profiles.find(p => p.id === id);
+
+    const profile = profilesRef.current.find(p => p.id === id);
     const currentCookies = { ...(cookies || profile?.config.cookies) };
 
     if (!currentCookies || Object.keys(currentCookies).length === 0) return;
 
     try {
-      let result: AccountResponse | null = null;
-
-      // 1. Try URL_BOTH first: fetches account gems & SvelteKit profile (name, email, avatar) in one call
-      try {
-        const bothResponse = await fetch(URL_BOTH, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(currentCookies)
-        });
-        if (bothResponse.ok) {
-          result = await bothResponse.json();
-        }
-      } catch (bothErr) {
-        console.warn(`URL_BOTH unavailable for ${id}, falling back to URL_ACCOUNT`, bothErr);
+      const result = await apiFetchAccount(currentCookies);
+      if (!result.ok) {
+        throw new Error(result.message || result.code);
       }
-
-      // 2. Fallback to URL_ACCOUNT if URL_BOTH didn't return a valid response
-      if (!result || !result.account) {
-        const accountResponse = await fetch(URL_ACCOUNT, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(currentCookies)
-        });
-
-        if (!accountResponse.ok) throw new Error(`HTTP ${accountResponse.status}`);
-        result = await accountResponse.json();
-      }
-      
-      if (!result || !result.account) {
-        throw new Error('Invalid response');
-      }
-
-      if (!result.account.ok) {
-        const errorMsg = result.account.body?.message || `HTTP ${result.account.status || 401}`;
-        throw new Error(errorMsg);
-      }
-
-      const body = result.account.body || {};
-      const userObj = body.user || {};
-
-      // 1. Safely resolve Gems balance from top-level body or nested userObj
-      const totalGems = 
-        (typeof body.gems === 'number' ? body.gems : null) ??
-        (typeof body.totalGems === 'number' ? body.totalGems : null) ??
-        (typeof userObj.gems === 'number' ? userObj.gems : null) ??
-        (typeof userObj.totalGems === 'number' ? userObj.totalGems : null) ??
-        0;
-
-      // 2. Extract accurate claim timing from Unlucid's SvelteKit /gems data
-      const extractedClaim = extractClaimData(
-        result.account?.body?.svelteData ||
-        result.account?.body ||
-        result.claim?.body ||
-        result
-      );
-
-      // 3. Check stored custom/persisted timer if available
-      let storedTimer: number | null = null;
-      try {
-        const timersStr = localStorage.getItem('unlucid_account_timers');
-        if (timersStr) {
-          const timersMap = JSON.parse(timersStr);
-          if (timersMap[id] && timersMap[id] > Date.now()) {
-            storedTimer = timersMap[id];
-          }
-        }
-      } catch (e) {}
-
-      // 4. Resolve claim readiness
-      const canClaim = 
-        extractedClaim.canClaimFreeGems ??
-        (typeof body.canClaimFreeGems === 'boolean' ? body.canClaimFreeGems : null) ??
-        (typeof userObj.canClaimFreeGems === 'boolean' ? userObj.canClaimFreeGems : null) ??
-        false;
-
-      // 5. Resolve claim timer
-      const nextFreeGemsAt = 
-        extractedClaim.nextFreeGemsAt ??
-        (typeof body.nextFreeGemsAt === 'number' && body.nextFreeGemsAt > Date.now() ? body.nextFreeGemsAt : null) ??
-        (typeof userObj.nextFreeGemsAt === 'number' && userObj.nextFreeGemsAt > Date.now() ? userObj.nextFreeGemsAt : null) ??
-        storedTimer ??
-        (canClaim ? Date.now() : Date.now() + 24 * 3600000);
-
-      // Extract user metadata (real Google display name, Gmail address, Google avatar)
-      const extractedMeta = extractProfileMetadata(
-        result.account?.body?.svelteData ||
-        result.account?.body ||
-        result.claim?.body ||
-        result
-      );
-      const resolvedName = extractedMeta.name || userObj.name || body.name || (profile?.config.name || id);
-      const resolvedEmail = extractedMeta.email || userObj.email || body.email || currentCookies['gmail'] || '';
-      const resolvedImage = extractedMeta.image || userObj.image || '';
-
-      // Auto-save the fetched Gmail and Name into cookies and localStorage so export & persistence keep it
-      if (resolvedEmail && currentCookies['gmail'] !== resolvedEmail) {
-        currentCookies['gmail'] = resolvedEmail;
-      }
-      if (resolvedName && currentCookies['name'] !== resolvedName) {
-        currentCookies['name'] = resolvedName;
-      }
-
-      const isGeneric = /^account \d+$/i.test(profile?.config.name || '') || /^account \d+$/i.test(id);
-      const finalConfigName = isGeneric && resolvedName ? resolvedName : (profile?.config.name || id);
-
-      try {
-        const stored = localStorage.getItem('unlucid_imported_cookies');
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          const targetKey = parsed[id] ? id : Object.keys(parsed).find(k => k === id || k.toLowerCase() === id.toLowerCase());
-          if (targetKey && parsed[targetKey]) {
-            const savedCookies = { ...parsed[targetKey], ...currentCookies };
-            if (isGeneric && resolvedName && resolvedName !== targetKey) {
-              delete parsed[targetKey];
-              parsed[resolvedName] = savedCookies;
-            } else {
-              parsed[targetKey] = savedCookies;
-            }
-            localStorage.setItem('unlucid_imported_cookies', JSON.stringify(parsed));
-          }
-        }
-      } catch (e) {}
-
-      const normalizedData: UserData = {
-        id: extractedMeta.id || userObj.id || id,
-        name: resolvedName,
-        email: resolvedEmail,
-        image: resolvedImage,
-        gems: totalGems,
-        totalGems: totalGems,
-        matureEnabled: Boolean(userObj.matureEnabled),
-        canClaimFreeGems: canClaim,
-        nextFreeGemsAt: nextFreeGemsAt,
-        date: userObj.date || Date.now(),
-        canApplyReferral: Boolean(userObj.canApplyReferral),
-        referralCode: userObj.referralCode || 'N/A',
-        referralCodeUses: userObj.referralCodeUses || 0,
-        referralLimit: userObj.referralLimit || 0,
-        referralReward: userObj.referralReward || 0,
-        isAdmin: Boolean(userObj.isAdmin),
-      };
-
-      // Runtime Deduplication: Check if another card already represents this exact user or session token
-      const currentToken = getPrimaryToken(currentCookies);
-      const existingDuplicate = profilesRef.current.find(p => {
-        if (p.id === id) return false;
-        if (currentToken && getPrimaryToken(p.config.cookies) === currentToken) return true;
-        if (normalizedData.id && p.data?.id && p.data.id === normalizedData.id) return true;
-        if (normalizedData.email && p.data?.email && p.data.email.toLowerCase() === normalizedData.email.toLowerCase()) return true;
-        return false;
-      });
-
-      if (existingDuplicate) {
-        console.warn(`Duplicate account detected for "${id}" matching existing "${existingDuplicate.id}". Pruning duplicate card.`);
-        setProfiles(prev => prev.filter(p => p.id !== id));
-        try {
-          const stored = localStorage.getItem('unlucid_imported_cookies');
-          if (stored) {
-            const parsed = JSON.parse(stored);
-            if (parsed[id]) {
-              delete parsed[id];
-              localStorage.setItem('unlucid_imported_cookies', JSON.stringify(parsed));
-            }
-          }
-        } catch (e) {}
-        return;
-      }
-
-      setProfiles(prev => prev.map(p => {
-          if (p.id !== id) return p;
-
-          return { 
-            ...p, 
-            status: 'idle', 
-            config: {
-              ...p.config,
-              name: finalConfigName,
-              cookies: currentCookies
-            },
-            data: normalizedData, 
-            lastUpdated: Date.now() 
-          };
-      }));
-
+      applyNormalizedAccount(id, currentCookies, result.data);
     } catch (err) {
       console.error(`Error fetching account ${id}:`, err);
-      setProfiles(prev => prev.map(p => p.id === id ? { 
-          ...p, status: 'error', message: err instanceof Error ? err.message : 'Connection Error'
+      setProfiles(prev => prev.map(p => p.id === id ? {
+        ...p,
+        status: 'error',
+        message: err instanceof Error ? err.message : 'Connection Error',
       } : p));
     }
   };
@@ -692,48 +628,50 @@ function App() {
 
   const claimGems = async (id: string): Promise<boolean> => {
     setProfiles(prev => prev.map(p => p.id === id ? { ...p, status: 'claiming', message: undefined } : p));
-    
+
     const profile = profilesRef.current.find(p => p.id === id);
     if (!profile) return false;
 
     try {
-      const response = await fetch(URL_CLAIM, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(profile.config.cookies)
-      });
+      const result = await apiClaimGems(profile.config.cookies);
 
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-      const result = await response.json();
-      if (result && result.claim && !result.claim.ok) {
-        const errorMsg = result.claim.body?.message || `Claim failed (${result.claim.status})`;
-
-        // If it was already claimed today (409), refresh timer and notify
-        if (result.claim.status === 409 || errorMsg.includes('already claimed')) {
+      if (!result.ok) {
+        if (result.code === 'ALREADY_CLAIMED') {
           await fetchAccountData(id);
-          setProfiles(prev => prev.map(p => p.id === id ? { ...p, message: errorMsg } : p));
+          setProfiles(prev => prev.map(p => p.id === id ? { ...p, message: result.message } : p));
           setTimeout(() => {
             setProfiles(prev => prev.map(p => p.id === id ? { ...p, message: undefined } : p));
           }, 4000);
           return false;
         }
 
-        throw new Error(errorMsg);
+        if (result.code === 'SESSION_EXPIRED') {
+          setProfiles(prev => prev.map(p => p.id === id ? {
+            ...p,
+            status: 'error',
+            message: result.message || 'Session expired',
+          } : p));
+          return false;
+        }
+
+        throw new Error(result.message || 'Claim failed');
       }
 
-      await fetchAccountData(id);
-      
+      if (result.data) {
+        applyNormalizedAccount(id, { ...profile.config.cookies }, result.data);
+      } else {
+        await fetchAccountData(id);
+      }
+
       setProfiles(prev => prev.map(p => {
-          if (p.id !== id) return p;
-          return { ...p, status: 'success', message: 'Claimed successfully' };
+        if (p.id !== id) return p;
+        return { ...p, status: 'success', message: result.message || 'Claimed successfully' };
       }));
 
       setTimeout(() => {
-          setProfiles(prev => prev.map(p => p.id === id ? { ...p, message: undefined } : p));
+        setProfiles(prev => prev.map(p => p.id === id ? { ...p, message: undefined } : p));
       }, 4000);
 
-      // Record 24h timer on successful claim
       try {
         const timersStr = localStorage.getItem('unlucid_account_timers');
         const timersMap = timersStr ? JSON.parse(timersStr) : {};
@@ -742,7 +680,6 @@ function App() {
       } catch (e) {}
 
       return true;
-
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Claim failed';
       setProfiles(prev => prev.map(p => p.id === id ? { ...p, status: 'error', message: errorMsg } : p));
@@ -830,8 +767,33 @@ function App() {
     setGlobalLoading(false);
   };
 
-  const handleRefreshAll = () => {
-    profiles.forEach(p => fetchAccountData(p.id));
+  const handleRefreshAll = async () => {
+    if (profiles.length === 0) return;
+    setGlobalLoading(true);
+    setProfiles(prev => prev.map(p => ({ ...p, status: 'loading', message: undefined })));
+
+    try {
+      const results = await apiBatchFetch(
+        profiles.map(p => ({ id: p.id, cookies: p.config.cookies }))
+      );
+
+      results.forEach((r) => {
+        if (r.ok && r.data) {
+          const profile = profilesRef.current.find(p => p.id === r.id);
+          applyNormalizedAccount(r.id, { ...(profile?.config.cookies || {}) }, r.data);
+        } else {
+          setProfiles(prev => prev.map(p => p.id === r.id ? {
+            ...p,
+            status: 'error',
+            message: r.message || 'Sync failed',
+          } : p));
+        }
+      });
+    } catch (err) {
+      profiles.forEach(p => fetchAccountData(p.id));
+    } finally {
+      setGlobalLoading(false);
+    }
   };
 
 

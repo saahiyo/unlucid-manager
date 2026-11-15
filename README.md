@@ -56,13 +56,45 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
+## API proxy
+
+This app ships with an **owned Unlucid proxy** under `/api`:
+
+| Route | Purpose |
+|-------|---------|
+| `POST /api/account` | Fetch normalized account + claim timer |
+| `POST /api/both` | Same as account (compat) |
+| `POST /api/claim` | Claim daily free gems |
+| `POST /api/batch` | Sync many accounts: `{ accounts: [{ id, cookies }] }` |
+
+Locally, Vite middleware serves these routes. On Vercel, the functions in `/api` deploy automatically. Optional `VITE_API_BASE` points at a separately hosted proxy.
+
+Normalized response shape:
+
+```json
+{
+  "ok": true,
+  "code": "OK",
+  "status": 200,
+  "profile": {
+    "gems": 48,
+    "canClaimFreeGems": false,
+    "nextFreeGemsAt": 1730000000000,
+    "name": "…",
+    "email": "…"
+  }
+}
+```
+
+Error codes: `SESSION_EXPIRED`, `ALREADY_CLAIMED`, `INVALID_REQUEST`, `UPSTREAM_ERROR`, `ERROR`.
+
 ## Technologies
 
 - [React](https://reactjs.org/)
 - [Vite](https://vitejs.dev/)
 - [Tailwind CSS](https://tailwindcss.com/)
 - [Lucide React](https://lucide.dev/)
-- [Framer Motion](https://www.framer.com/motion/) (conceptually, custom implementation)
+- [Motion](https://motion.dev/)
 
 ## License
 
