@@ -39,7 +39,22 @@ async function postJson<T>(url: string, body: unknown, signal?: AbortSignal): Pr
       signal: signal || controller!.signal,
     });
 
-    const data = await res.json();
+    const text = await res.text();
+    let data: any = null;
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch {
+      throw new Error(
+        res.ok
+          ? 'Invalid JSON from API'
+          : `API ${res.status}: ${text.slice(0, 120) || res.statusText}`
+      );
+    }
+
+    if (!data || typeof data !== 'object') {
+      throw new Error(`API ${res.status}: empty response`);
+    }
+
     return data as T;
   } finally {
     if (timeout) clearTimeout(timeout);

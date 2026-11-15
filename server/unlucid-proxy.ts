@@ -383,25 +383,12 @@ export async function batchFetchAccounts(
   return { results };
 }
 
-/** Parse JSON body from Node IncomingMessage / Vite Connect req */
-export async function readJsonBody(req: { on?: Function; body?: any }): Promise<any> {
-  if (req.body && typeof req.body === 'object') return req.body;
-
-  return new Promise((resolve, reject) => {
-    if (typeof req.on !== 'function') {
-      resolve({});
-      return;
-    }
-    const chunks: Buffer[] = [];
-    req.on('data', (chunk: Buffer) => chunks.push(chunk));
-    req.on('end', () => {
-      try {
-        const raw = Buffer.concat(chunks).toString('utf8');
-        resolve(raw ? JSON.parse(raw) : {});
-      } catch (e) {
-        reject(e);
-      }
-    });
-    req.on('error', reject);
+/** Web Response helper for Vercel Edge / fetch handlers */
+export function toWebResponse(
+  out: { status: number; headers: Record<string, string>; body: string }
+): Response {
+  return new Response(out.body, {
+    status: out.status,
+    headers: out.headers,
   });
 }

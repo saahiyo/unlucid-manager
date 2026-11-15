@@ -5,7 +5,6 @@ import {
   fetchAccount,
   handleOptions,
   jsonResponse,
-  readJsonBody,
 } from './unlucid-proxy';
 
 function send(
@@ -15,6 +14,29 @@ function send(
   res.statusCode = out.status;
   Object.entries(out.headers).forEach(([k, v]) => res.setHeader(k, v));
   res.end(out.body);
+}
+
+/** Parse JSON body from Vite Connect IncomingMessage */
+async function readJsonBody(req: { on?: Function; body?: any }): Promise<any> {
+  if (req.body && typeof req.body === 'object') return req.body;
+
+  return new Promise((resolve, reject) => {
+    if (typeof req.on !== 'function') {
+      resolve({});
+      return;
+    }
+    const chunks: Buffer[] = [];
+    req.on('data', (chunk: Buffer) => chunks.push(chunk));
+    req.on('end', () => {
+      try {
+        const raw = Buffer.concat(chunks).toString('utf8');
+        resolve(raw ? JSON.parse(raw) : {});
+      } catch (e) {
+        reject(e);
+      }
+    });
+    req.on('error', reject);
+  });
 }
 
 /**

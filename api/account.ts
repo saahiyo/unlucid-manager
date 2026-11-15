@@ -1,47 +1,41 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
 import {
   fetchAccount,
   handleOptions,
   jsonResponse,
+  toWebResponse,
 } from '../server/unlucid-proxy';
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const origin = req.headers.origin || null;
+export const config = { runtime: 'edge' };
+
+export default async function handler(req: Request): Promise<Response> {
+  const origin = req.headers.get('origin');
 
   if (req.method === 'OPTIONS') {
-    const out = handleOptions(origin);
-    res.status(out.status);
-    Object.entries(out.headers).forEach(([k, v]) => res.setHeader(k, v));
-    return res.end();
+    return toWebResponse(handleOptions(origin));
   }
 
   if (req.method !== 'POST') {
-    const out = jsonResponse({ ok: false, code: 'INVALID_REQUEST', message: 'POST only' }, 405, origin);
-    res.status(out.status);
-    Object.entries(out.headers).forEach(([k, v]) => res.setHeader(k, v));
-    return res.send(out.body);
+    return toWebResponse(
+      jsonResponse({ ok: false, code: 'INVALID_REQUEST', message: 'POST only' }, 405, origin)
+    );
   }
 
   try {
-    const cookies = typeof req.body === 'object' && req.body ? req.body : {};
-    const result = await fetchAccount(cookies);
-    const out = jsonResponse(result, result.ok ? 200 : result.status || 400, origin);
-    res.status(out.status);
-    Object.entries(out.headers).forEach(([k, v]) => res.setHeader(k, v));
-    return res.send(out.body);
+    const cookies = await req.json().catch(() => ({}));
+    const result = await fetchAccount(cookies || {});
+    return toWebResponse(jsonResponse(result, result.ok ? 200 : result.status || 400, origin));
   } catch (err) {
-    const out = jsonResponse(
-      {
-        ok: false,
-        code: 'ERROR',
-        message: err instanceof Error ? err.message : 'Server error',
-        status: 500,
-      },
-      500,
-      origin
+    return toWebResponse(
+      jsonResponse(
+        {
+          ok: false,
+          code: 'ERROR',
+          message: err instanceof Error ? err.message : 'Server error',
+          status: 500,
+        },
+        500,
+        origin
+      )
     );
-    res.status(out.status);
-    Object.entries(out.headers).forEach(([k, v]) => res.setHeader(k, v));
-    return res.send(out.body);
   }
 }
