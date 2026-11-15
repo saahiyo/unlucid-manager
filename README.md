@@ -39,7 +39,7 @@ A modern, high-performance dashboard for managing multiple Unlucid accounts, tra
     Open `.env` and paste your cookies JSON string into `VITE_COOKIES`.
 
     **On Vercel (set once):**
-    1. Add **Upstash Redis** from the Vercel Storage / Marketplace (auto-sets `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN`).
+    1. Add **Upstash Redis** from Vercel Storage / Marketplace and connect it to this project (injects `KV_REST_API_URL` + `KV_REST_API_TOKEN`).
     2. Environment variables:
        - `CRON_SECRET` — long random string (cron auth)
        - `VITE_SYNC_SECRET` — **same value** as `CRON_SECRET` (dashboard sync auth)

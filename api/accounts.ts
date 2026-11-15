@@ -54,7 +54,7 @@ export default async function handler(req: Request): Promise<Response> {
           ok: false,
           code: 'ERROR',
           message:
-            'Remote store not configured. Add Upstash Redis (UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN) on Vercel.',
+            'Remote store not configured. Connect Upstash Redis / KV to this project (KV_REST_API_URL + KV_REST_API_TOKEN).',
         },
         503,
         origin

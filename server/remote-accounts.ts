@@ -1,6 +1,7 @@
 /**
  * Writable server-side account cookie store for cron auto-claim.
- * Prefer Upstash Redis (set once). Local Vite falls back to .data/remote-accounts.json.
+ * Edge-safe: Redis/KV via fetch only (no Node builtins).
+ * Local Vite file fallback lives in remote-accounts-local.ts.
  */
 
 import type { BatchAccountItem } from './unlucid-proxy';
@@ -22,18 +23,22 @@ function envOf(env?: Env): Env {
   return env || (typeof process !== 'undefined' ? process.env : {});
 }
 
+/** Vercel Marketplace Upstash KV uses KV_REST_API_*; classic Upstash uses UPSTASH_REDIS_REST_*. */
+function redisRestCreds(env: Env): { url: string; token: string } | null {
+  const url = env.KV_REST_API_URL || env.UPSTASH_REDIS_REST_URL;
+  const token = env.KV_REST_API_TOKEN || env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token) return null;
+  return { url, token };
+}
+
 export function hasRemoteStore(env?: Env): boolean {
-  const e = envOf(env);
-  if (e.UPSTASH_REDIS_REST_URL && e.UPSTASH_REDIS_REST_TOKEN) return true;
-  // Node / Vite local file fallback
-  if (typeof process !== 'undefined' && process.versions?.node) return true;
-  return false;
+  return Boolean(redisRestCreds(envOf(env)));
 }
 
 async function upstashCommand(env: Env, command: unknown[]): Promise<unknown> {
-  const url = env.UPSTASH_REDIS_REST_URL;
-  const token = env.UPSTASH_REDIS_REST_TOKEN;
-  if (!url || !token) throw new Error('Upstash is not configured');
+  const creds = redisRestCreds(env);
+  if (!creds) throw new Error('Upstash / KV Redis is not configured');
+  const { url, token } = creds;
 
   const res = await fetch(url, {
     method: 'POST',
@@ -51,31 +56,7 @@ async function upstashCommand(env: Env, command: unknown[]): Promise<unknown> {
   return data?.result;
 }
 
-function localFilePath(): string {
-  return `${process.cwd()}/.data/remote-accounts.json`;
-}
-
-async function readLocalFile(): Promise<Record<string, RemoteAccount>> {
-  try {
-    const fs = await import('node:fs/promises');
-    const raw = await fs.readFile(localFilePath(), 'utf8');
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
-    return parsed as Record<string, RemoteAccount>;
-  } catch {
-    return {};
-  }
-}
-
-async function writeLocalFile(map: Record<string, RemoteAccount>): Promise<void> {
-  const fs = await import('node:fs/promises');
-  const path = await import('node:path');
-  const file = localFilePath();
-  await fs.mkdir(path.dirname(file), { recursive: true });
-  await fs.writeFile(file, JSON.stringify(map, null, 2), 'utf8');
-}
-
-function normalizeMap(raw: unknown): Record<string, RemoteAccount> {
+export function normalizeRemoteMap(raw: unknown): Record<string, RemoteAccount> {
   if (!raw) return {};
   let parsed = raw;
   if (typeof raw === 'string') {
@@ -104,14 +85,9 @@ function normalizeMap(raw: unknown): Record<string, RemoteAccount> {
 
 export async function readRemoteAccounts(env?: Env): Promise<Record<string, RemoteAccount>> {
   const e = envOf(env);
-  if (e.UPSTASH_REDIS_REST_URL && e.UPSTASH_REDIS_REST_TOKEN) {
-    const result = await upstashCommand(e, ['GET', REMOTE_ACCOUNTS_KEY]);
-    return normalizeMap(result);
-  }
-  if (typeof process !== 'undefined' && process.versions?.node) {
-    return readLocalFile();
-  }
-  return {};
+  if (!redisRestCreds(e)) return {};
+  const result = await upstashCommand(e, ['GET', REMOTE_ACCOUNTS_KEY]);
+  return normalizeRemoteMap(result);
 }
 
 export async function writeRemoteAccounts(
@@ -119,15 +95,10 @@ export async function writeRemoteAccounts(
   env?: Env
 ): Promise<void> {
   const e = envOf(env);
-  if (e.UPSTASH_REDIS_REST_URL && e.UPSTASH_REDIS_REST_TOKEN) {
-    await upstashCommand(e, ['SET', REMOTE_ACCOUNTS_KEY, JSON.stringify(map)]);
-    return;
+  if (!redisRestCreds(e)) {
+    throw new Error('No remote store configured (connect Upstash KV on Vercel)');
   }
-  if (typeof process !== 'undefined' && process.versions?.node) {
-    await writeLocalFile(map);
-    return;
-  }
-  throw new Error('No remote store configured (add Upstash Redis on Vercel)');
+  await upstashCommand(e, ['SET', REMOTE_ACCOUNTS_KEY, JSON.stringify(map)]);
 }
 
 export async function upsertRemoteAccount(
@@ -143,7 +114,6 @@ export async function upsertRemoteAccount(
     updatedAt: account.updatedAt || Date.now(),
   };
 
-  // Drop any prior row with same email under a different id
   if (next.email) {
     for (const [key, existing] of Object.entries(map)) {
       if (key === next.id) continue;

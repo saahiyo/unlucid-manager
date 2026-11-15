@@ -10,12 +10,15 @@ import {
 } from './unlucid-proxy';
 import {
   authorizeSyncRequest,
-  deleteRemoteAccount,
+  hasRemoteStore,
   loadCronAccounts,
-  readRemoteAccounts,
-  replaceRemoteAccounts,
-  upsertRemoteAccount,
 } from './remote-accounts';
+import {
+  deleteAccountForVite,
+  readAccountsForVite,
+  replaceAccountsForVite,
+  upsertAccountForVite,
+} from './remote-accounts-local';
 
 function send(
   res: any,
@@ -131,7 +134,7 @@ export function unlucidApiPlugin(): Plugin {
             }
 
             if (req.method === 'GET') {
-              const map = await readRemoteAccounts();
+              const map = await readAccountsForVite();
               return send(
                 res,
                 jsonResponse({ ok: true, accounts: Object.values(map), count: Object.keys(map).length }, 200, origin)
@@ -149,7 +152,7 @@ export function unlucidApiPlugin(): Plugin {
             const op = String(body?.op || 'list');
 
             if (op === 'list') {
-              const map = await readRemoteAccounts();
+              const map = await readAccountsForVite();
               return send(
                 res,
                 jsonResponse({ ok: true, accounts: Object.values(map), count: Object.keys(map).length }, 200, origin)
@@ -168,7 +171,7 @@ export function unlucidApiPlugin(): Plugin {
                   )
                 );
               }
-              const saved = await upsertRemoteAccount({
+              const saved = await upsertAccountForVite({
                 id: String(account.id),
                 email: account.email ? String(account.email) : undefined,
                 label: account.label ? String(account.label) : undefined,
@@ -185,13 +188,13 @@ export function unlucidApiPlugin(): Plugin {
                   jsonResponse({ ok: false, code: 'INVALID_REQUEST', message: 'id required' }, 400, origin)
                 );
               }
-              const removed = await deleteRemoteAccount(id);
+              const removed = await deleteAccountForVite(id);
               return send(res, jsonResponse({ ok: true, removed }, 200, origin));
             }
 
             if (op === 'replace') {
               const accounts = Array.isArray(body?.accounts) ? body.accounts : [];
-              const saved = await replaceRemoteAccounts(accounts);
+              const saved = await replaceAccountsForVite(accounts);
               return send(
                 res,
                 jsonResponse({ ok: true, accounts: saved, count: saved.length }, 200, origin)
