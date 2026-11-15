@@ -383,6 +383,184 @@ export async function batchFetchAccounts(
   return { results };
 }
 
+export type AutoClaimAction = 'claimed' | 'skipped' | 'failed';
+
+export interface AutoClaimItemResult {
+  id: string;
+  action: AutoClaimAction;
+  code: ProxyErrorCode;
+  message?: string;
+  gems?: number;
+  canClaimFreeGems?: boolean;
+  nextFreeGemsAt?: number;
+}
+
+export interface AutoClaimSummary {
+  ok: boolean;
+  code: ProxyErrorCode;
+  message?: string;
+  claimed: number;
+  skipped: number;
+  failed: number;
+  total: number;
+  ranAt: number;
+  results: AutoClaimItemResult[];
+}
+
+/** Parse cookies map from env JSON: `{ "account": { cookie: value, ... }, ... }` */
+export function parseCookiesEnv(raw: string | undefined | null): BatchAccountItem[] {
+  if (!raw || !raw.trim()) return [];
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return [];
+  }
+
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return [];
+
+  return Object.entries(parsed as Record<string, unknown>)
+    .filter(([, value]) => value && typeof value === 'object' && !Array.isArray(value))
+    .map(([id, cookies]) => ({
+      id,
+      cookies: cookies as Record<string, string>,
+    }))
+    .slice(0, 40);
+}
+
+/**
+ * Server-side auto-claim: check each account, claim only when free gems are ready.
+ * Processes in small batches to limit upstream pressure.
+ */
+export async function runAutoClaim(
+  items: BatchAccountItem[],
+  options?: { concurrency?: number; now?: number }
+): Promise<AutoClaimSummary> {
+  const now = options?.now ?? Date.now();
+  const concurrency = Math.max(1, Math.min(options?.concurrency ?? 3, 8));
+  const limited = items.slice(0, 40);
+  const results: AutoClaimItemResult[] = [];
+
+  for (let i = 0; i < limited.length; i += concurrency) {
+    const chunk = limited.slice(i, i + concurrency);
+    const chunkResults = await Promise.all(
+      chunk.map(async (item): Promise<AutoClaimItemResult> => {
+        const account = await fetchAccount(item.cookies || {});
+        if (!account.ok || !account.profile) {
+          return {
+            id: item.id,
+            action: 'failed',
+            code: account.code,
+            message: account.message || 'Account fetch failed',
+          };
+        }
+
+        const { profile } = account;
+        const ready =
+          profile.canClaimFreeGems ||
+          (typeof profile.nextFreeGemsAt === 'number' && profile.nextFreeGemsAt <= now);
+
+        if (!ready) {
+          return {
+            id: item.id,
+            action: 'skipped',
+            code: 'OK',
+            message: 'Not ready',
+            gems: profile.gems,
+            canClaimFreeGems: profile.canClaimFreeGems,
+            nextFreeGemsAt: profile.nextFreeGemsAt,
+          };
+        }
+
+        const claim = await claimGems(item.cookies || {});
+        if (!claim.ok) {
+          // Already claimed is a soft skip — cron may race the reset window
+          if (claim.code === 'ALREADY_CLAIMED') {
+            return {
+              id: item.id,
+              action: 'skipped',
+              code: claim.code,
+              message: claim.message || 'Already claimed',
+              gems: claim.profile?.gems ?? profile.gems,
+              canClaimFreeGems: claim.profile?.canClaimFreeGems ?? false,
+              nextFreeGemsAt: claim.profile?.nextFreeGemsAt ?? profile.nextFreeGemsAt,
+            };
+          }
+          return {
+            id: item.id,
+            action: 'failed',
+            code: claim.code,
+            message: claim.message || 'Claim failed',
+            gems: profile.gems,
+            canClaimFreeGems: profile.canClaimFreeGems,
+            nextFreeGemsAt: profile.nextFreeGemsAt,
+          };
+        }
+
+        return {
+          id: item.id,
+          action: 'claimed',
+          code: 'OK',
+          message: claim.message || 'Claimed successfully',
+          gems: claim.profile?.gems ?? profile.gems,
+          canClaimFreeGems: claim.profile?.canClaimFreeGems ?? false,
+          nextFreeGemsAt: claim.profile?.nextFreeGemsAt,
+        };
+      })
+    );
+    results.push(...chunkResults);
+  }
+
+  const claimed = results.filter((r) => r.action === 'claimed').length;
+  const skipped = results.filter((r) => r.action === 'skipped').length;
+  const failed = results.filter((r) => r.action === 'failed').length;
+
+  return {
+    ok: true,
+    code: 'OK',
+    claimed,
+    skipped,
+    failed,
+    total: results.length,
+    ranAt: now,
+    results,
+  };
+}
+
+/** Resolve server cookie store for cron (prefer non-VITE secret). */
+export function loadCronAccountsFromEnv(
+  env: Record<string, string | undefined> = typeof process !== 'undefined' ? process.env : {}
+): BatchAccountItem[] {
+  return parseCookiesEnv(env.UNLUCID_COOKIES || env.VITE_COOKIES);
+}
+
+/** Authorize cron / manual trigger via CRON_SECRET Bearer token. */
+export function authorizeCronRequest(
+  req: Request,
+  env: Record<string, string | undefined> = typeof process !== 'undefined' ? process.env : {}
+): { ok: true } | { ok: false; status: number; message: string } {
+  const secret = env.CRON_SECRET;
+  if (!secret) {
+    return {
+      ok: false,
+      status: 500,
+      message: 'CRON_SECRET is not configured',
+    };
+  }
+
+  const auth = req.headers.get('authorization') || '';
+  const bearer = auth.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
+  const querySecret = new URL(req.url).searchParams.get('secret');
+  const provided = bearer || querySecret;
+
+  if (!provided || provided !== secret) {
+    return { ok: false, status: 401, message: 'Unauthorized' };
+  }
+
+  return { ok: true };
+}
+
 /** Web Response helper for Vercel Edge / fetch handlers */
 export function toWebResponse(
   out: { status: number; headers: Record<string, string>; body: string }

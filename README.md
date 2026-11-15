@@ -7,9 +7,9 @@ A modern, high-performance dashboard for managing multiple Unlucid accounts, tra
 - **Multi-Account Dashboard**: View all your accounts in a sleek, responsive grid or masonry layout.
 - **Real-time Stats**: Track total gems and ready-to-claim status instantly.
 - **Claim**: Claim gems for individual accounts or all eligible accounts with one click.
-- **Drawing Cursor**: Enjoy a smooth, interactive emerald trail effect as you navigate.
+- **Server Auto-Claim**: Vercel Cron claims ready accounts hourly without keeping a browser tab open.
 - **Dark/Light Mode**: Fully supported themes with a premium glassmorphism aesthetic.
-- **Secure**: Your tokens are stored locally in your configuration file.
+- **Secure**: Tokens live in env vars; cron is gated by `CRON_SECRET`.
 
 A modern, high-performance dashboard for managing multiple Unlucid accounts, tracking gems, and automating claims. Built with React, Vite, and Tailwind CSS.
 
@@ -39,12 +39,13 @@ A modern, high-performance dashboard for managing multiple Unlucid accounts, tra
     Open `.env` and paste your cookies JSON string into `VITE_COOKIES`.
 
     **On Vercel:**
-    Go to your project settings > Environment Variables.
-    Add a new variable:
-    - **Key**: `VITE_COOKIES`
-    - **Value**: Your full cookies JSON string (e.g., `{"my_account": {...}}`).
+    Go to your project settings > Environment Variables and add:
+    - `VITE_COOKIES` — cookies JSON for the dashboard (e.g. `{"my_account": {...}}`)
+    - `UNLUCID_COOKIES` — same JSON for **server auto-claim** (recommended; falls back to `VITE_COOKIES`)
+    - `CRON_SECRET` — long random string; Vercel Cron sends it as `Authorization: Bearer …`
 
     > **Note:** The JSON string must be valid. You can minify it to a single line.
+    > Browser-imported accounts in localStorage are **not** claimed by cron — only env accounts are.
 
 ## Usage
 
@@ -66,8 +67,21 @@ This app ships with an **owned Unlucid proxy** under `/api`:
 | `POST /api/both` | Same as account (compat) |
 | `POST /api/claim` | Claim daily free gems |
 | `POST /api/batch` | Sync many accounts: `{ accounts: [{ id, cookies }] }` |
+| `GET/POST /api/cron/auto-claim` | Server auto-claim (cron / manual); requires `CRON_SECRET` |
 
 Locally, Vite middleware serves these routes. On Vercel, the functions in `/api` deploy automatically. Optional `VITE_API_BASE` points at a separately hosted proxy.
+
+### Server auto-claim
+
+`vercel.json` schedules `/api/cron/auto-claim` every hour (`0 * * * *`). On Vercel Hobby, change the schedule to once daily (e.g. `0 8 * * *`).
+
+Manual test (local or production):
+
+```bash
+curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/auto-claim
+```
+
+Response includes `claimed`, `skipped`, `failed`, and per-account `results`.
 
 Normalized response shape:
 

@@ -1,10 +1,13 @@
 import type { Plugin } from 'vite';
 import {
+  authorizeCronRequest,
   batchFetchAccounts,
   claimGems,
   fetchAccount,
   handleOptions,
   jsonResponse,
+  loadCronAccountsFromEnv,
+  runAutoClaim,
 } from './unlucid-proxy';
 
 function send(
@@ -95,6 +98,61 @@ export function unlucidApiPlugin(): Plugin {
               }))
             );
             return send(res, jsonResponse({ ok: true, ...result }, 200, origin));
+          }
+
+          if (url === '/api/cron/auto-claim') {
+            if (req.method !== 'GET' && req.method !== 'POST') {
+              return send(
+                res,
+                jsonResponse({ ok: false, code: 'INVALID_REQUEST', message: 'GET or POST only' }, 405, origin)
+              );
+            }
+
+            const host = req.headers.host || 'localhost';
+            const proto = host.includes('localhost') ? 'http' : 'https';
+            const authReq = new Request(`${proto}://${host}${req.url}`, {
+              method: req.method,
+              headers: req.headers as HeadersInit,
+            });
+            const auth = authorizeCronRequest(authReq);
+            if (auth.ok === false) {
+              return send(
+                res,
+                jsonResponse(
+                  {
+                    ok: false,
+                    code: auth.status === 401 ? 'INVALID_REQUEST' : 'ERROR',
+                    message: auth.message,
+                  },
+                  auth.status,
+                  origin
+                )
+              );
+            }
+
+            const accounts = loadCronAccountsFromEnv();
+            if (accounts.length === 0) {
+              return send(
+                res,
+                jsonResponse(
+                  {
+                    ok: false,
+                    code: 'INVALID_REQUEST',
+                    message: 'No accounts in UNLUCID_COOKIES or VITE_COOKIES',
+                    claimed: 0,
+                    skipped: 0,
+                    failed: 0,
+                    total: 0,
+                    results: [],
+                  },
+                  400,
+                  origin
+                )
+              );
+            }
+
+            const summary = await runAutoClaim(accounts);
+            return send(res, jsonResponse(summary, 200, origin));
           }
 
           return next();
