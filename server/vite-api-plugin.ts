@@ -10,7 +10,6 @@ import {
 } from './unlucid-proxy';
 import {
   authorizeSyncRequest,
-  hasRemoteStore,
   loadCronAccounts,
 } from './remote-accounts';
 import {
