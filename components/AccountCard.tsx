@@ -3,8 +3,6 @@ import React, { useState, useEffect } from 'react';
 import { ProfileState } from '../types';
 import { Card } from './Card';
 import { 
-  Gem, 
-  Clock, 
   User, 
   RefreshCw, 
   Loader2, 
@@ -12,7 +10,6 @@ import {
   ChevronDown, 
   Copy, 
   Check, 
-  Sparkles,
   Pencil,
   Trash2,
   X,
@@ -207,31 +204,30 @@ export const AccountCard: React.FC<AccountCardProps> = ({
   return (
     <Card 
       className={`
-        relative overflow-hidden flex flex-col
-        bg-white/65 dark:bg-[#121214]/80 hover:bg-white/80 dark:hover:bg-[#18181b]/90 backdrop-blur-md
-        ${isReady && !isLoading && !isEditing ? 'border-emerald-500/50 shadow-[0_0_30px_-10px_rgba(16,185,129,0.3)]' : 'border-zinc-300/70 dark:border-white/5 shadow-sm shadow-zinc-400/10 dark:shadow-xl'}
+        relative overflow-hidden flex flex-col transition-colors duration-300
+        bg-white/70 dark:bg-[#121214]/85 backdrop-blur-md
+        ${isReady && !isLoading && !isEditing
+          ? 'border-emerald-500/35 dark:border-emerald-500/30'
+          : 'border-zinc-300/60 dark:border-white/[0.07]'}
       `}
     >
       {/* Loading Overlay */}
       {isLoading && (
-        <div className="absolute inset-0 z-20 bg-black/60 backdrop-blur-[2px] flex items-center justify-center">
-            <div className="flex flex-col items-center gap-2">
-                <Loader2 size={24} className="animate-spin text-emerald-500" />
-                <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-500 uppercase tracking-widest">Processing</span>
-            </div>
+        <div className="absolute inset-0 z-20 bg-[#09090b]/50 dark:bg-black/50 backdrop-blur-[1px] flex items-center justify-center">
+          <Loader2 size={20} className="animate-spin text-emerald-500" />
         </div>
       )}
 
       {/* Header Section */}
       {isEditing ? (
-        <div className="p-4 border-b border-zinc-200 dark:border-white/5 flex justify-between items-center bg-gradient-to-b from-white/[0.04] to-transparent">
+        <div className="p-4 border-b border-zinc-200/80 dark:border-white/5 flex justify-between items-center">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-500">
-              <Key size={15} />
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-zinc-100 dark:bg-white/5 text-zinc-500 dark:text-zinc-400">
+              <Key size={14} />
             </div>
             <div>
-              <h3 className="font-bold text-xs uppercase tracking-wider text-zinc-800 dark:text-zinc-200">Edit Account</h3>
-              <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono">Update credentials</p>
+              <h3 className="font-semibold text-xs text-zinc-800 dark:text-zinc-200">Edit account</h3>
+              <p className="text-[10px] text-zinc-400 dark:text-zinc-500">Update credentials</p>
             </div>
           </div>
           
@@ -251,12 +247,9 @@ export const AccountCard: React.FC<AccountCardProps> = ({
           </button>
         </div>
       ) : (
-        <div className="p-4 border-b border-zinc-200 dark:border-white/5 flex justify-between items-start bg-gradient-to-b from-white/[0.02] to-transparent">
+        <div className="p-4 border-b border-zinc-200/80 dark:border-white/5 flex justify-between items-start">
           <div className="flex items-center gap-3 overflow-hidden min-w-0">
-            <div className={`
-              w-9 h-9 rounded-lg flex items-center justify-center border transition-colors overflow-hidden shrink-0
-              ${isReady ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-500' : 'bg-zinc-100 dark:bg-zinc-900 border-zinc-200 dark:border-white/10 text-zinc-400 dark:text-zinc-500'}
-            `}>
+            <div className="w-9 h-9 rounded-full flex items-center justify-center overflow-hidden shrink-0 bg-zinc-100 dark:bg-zinc-900 text-zinc-400 dark:text-zinc-500 ring-1 ring-zinc-200/80 dark:ring-white/10">
               {data?.image ? (
                 <img 
                   src={data.image} 
@@ -268,15 +261,15 @@ export const AccountCard: React.FC<AccountCardProps> = ({
                   }}
                 />
               ) : (
-                <User size={16} />
+                <User size={15} />
               )}
             </div>
             <div className="flex flex-col overflow-hidden min-w-0">
-              <h3 className="font-bold text-zinc-800 dark:text-zinc-200 text-sm truncate leading-tight" title={data?.name || config.name}>
+              <h3 className="font-semibold text-zinc-800 dark:text-zinc-100 text-sm truncate leading-tight" title={data?.name || config.name}>
                 {data?.name || config.name}
               </h3>
               <div 
-                className="flex items-center gap-1 mt-0.5 group/email cursor-pointer text-zinc-500 dark:text-zinc-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"
+                className="flex items-center gap-1 mt-0.5 group/email cursor-pointer text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors"
                 onClick={(e) => {
                   e.stopPropagation();
                   const targetEmail = data?.email || config.cookies['gmail'];
@@ -284,7 +277,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({
                 }}
                 title={data?.email || config.cookies['gmail'] ? "Click to copy Gmail address" : ""}
               >
-                <p className="text-[10px] truncate font-mono">
+                <p className="text-[11px] truncate font-mono">
                   {data?.email || config.cookies['gmail'] || '...'}
                 </p>
                 {(data?.email || config.cookies['gmail']) && (
@@ -296,21 +289,21 @@ export const AccountCard: React.FC<AccountCardProps> = ({
             </div>
           </div>
           
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-0.5 shrink-0">
             <button 
               onClick={(e) => { 
                 e.stopPropagation(); 
                 setIsEditing(true); 
                 setIsDeletingConfirm(false);
               }}
-              className="p-1.5 text-zinc-400 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/5 rounded-md transition-colors"
+              className="p-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/5 rounded-md transition-colors"
               title="Edit Account"
             >
               <Pencil size={13} />
             </button>
             <button 
               onClick={(e) => { e.stopPropagation(); onRefresh(profile.id); }}
-              className="p-1.5 text-zinc-400 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/5 rounded-md transition-colors"
+              className="p-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/5 rounded-md transition-colors"
               title="Refresh Profile"
             >
               <RefreshCw size={13} />
@@ -504,69 +497,48 @@ export const AccountCard: React.FC<AccountCardProps> = ({
         </div>
       ) : data ? (
         <div className="flex-1 p-4 flex flex-col">
-          
-          {/* Main Stats Row */}
-          <div className="grid grid-cols-2 gap-3 mb-4">
-            {/* Gems */}
-            <div className="bg-zinc-100/90 dark:bg-black/40 rounded-lg p-3 border border-zinc-300/60 dark:border-white/5 relative group">
-              <div className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider mb-1 flex items-center gap-1">
-                <Gem size={10} className="text-purple-500" /> Balance
-              </div>
-              <div className="text-xl font-mono font-bold text-zinc-800 dark:text-zinc-200 group-hover:text-zinc-900 dark:group-hover:text-white transition-colors pt-2">
+          {/* Stats — open typography, no nested boxes */}
+          <div className="grid grid-cols-2 gap-6 mb-5">
+            <div>
+              <p className="text-[10px] font-medium tracking-wide uppercase text-zinc-400 dark:text-zinc-500 mb-1.5">
+                Balance
+              </p>
+              <div className="text-2xl font-mono font-medium tabular-nums text-zinc-900 dark:text-zinc-100 tracking-tight">
                 <SlidingNumber value={data.gems} />
               </div>
             </div>
 
-            {/* Timer */}
-            <div className={`rounded-lg p-3 border relative group transition-colors ${isReady ? 'bg-emerald-500/10 dark:bg-emerald-900/10 border-emerald-500/25' : 'bg-zinc-100/90 dark:bg-black/40 border-zinc-300/60 dark:border-white/5'}`}>
-              <div className="text-[9px] font-bold uppercase tracking-wider mb-1 flex items-center justify-between transition-colors">
-                {isReady ? (
-                  <span className="text-emerald-500 flex items-center gap-1">
-                    <Sparkles size={10} /> Ready
-                  </span>
-                ) : (
-                  <span className="text-zinc-500 flex items-center gap-1">
-                    <Clock size={10} /> Next
-                  </span>
-                )}
-                {/* Adjust Timer button */}
+            <div className="group">
+              <div className="flex items-center justify-between mb-1.5">
+                <p className={`text-[10px] font-medium tracking-wide uppercase ${isReady ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-400 dark:text-zinc-500'}`}>
+                  {isReady ? 'Ready' : 'Next claim'}
+                </p>
                 <button
                   type="button"
                   onClick={() => {
                     setIsEditingTimer(!isEditingTimer);
                     setCustomTimerInput(timeLeft ? `${timeLeft.h}h ${timeLeft.m}m` : '');
                   }}
-                  className="opacity-0 group-hover:opacity-100 hover:text-emerald-500 text-zinc-400 dark:text-zinc-500 transition-all p-0.5 rounded"
-                  title="Adjust claim timer (e.g. 9h 50m)"
+                  className="opacity-0 group-hover:opacity-100 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-opacity p-0.5"
+                  title="Adjust claim timer"
                 >
                   <Pencil size={10} />
                 </button>
               </div>
 
               {isEditingTimer ? (
-                <form onSubmit={handleSaveCustomTimer} className="pt-0.5 space-y-1">
+                <form onSubmit={handleSaveCustomTimer} className="space-y-1.5">
                   <input
                     type="text"
                     value={customTimerInput}
                     onChange={(e) => setCustomTimerInput(e.target.value)}
-                    placeholder="9h 50m or 9:50"
+                    placeholder="9h 50m"
                     autoFocus
-                    className="w-full text-xs font-mono bg-white dark:bg-zinc-900 border border-emerald-500/50 rounded px-1.5 py-1 text-zinc-800 dark:text-white focus:outline-none"
+                    className="w-full text-xs font-mono bg-transparent border-b border-emerald-500/60 py-1 text-zinc-800 dark:text-white focus:outline-none"
                   />
-                  <div className="flex gap-1 justify-end">
-                    <button
-                      type="button"
-                      onClick={() => setIsEditingTimer(false)}
-                      className="text-[9px] px-1.5 py-0.5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      className="text-[9px] px-2 py-0.5 bg-emerald-500 text-white font-bold rounded hover:bg-emerald-600"
-                    >
-                      Save
-                    </button>
+                  <div className="flex gap-2 justify-end">
+                    <button type="button" onClick={() => setIsEditingTimer(false)} className="text-[10px] text-zinc-400 hover:text-zinc-600">Cancel</button>
+                    <button type="submit" className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">Save</button>
                   </div>
                 </form>
               ) : (
@@ -575,132 +547,116 @@ export const AccountCard: React.FC<AccountCardProps> = ({
                     setIsEditingTimer(true);
                     setCustomTimerInput(timeLeft ? `${timeLeft.h}h ${timeLeft.m}m` : '');
                   }}
-                  className={`text-xl font-mono font-bold transition-colors cursor-pointer select-none ${isReady ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-400'}`}
+                  className={`text-2xl font-mono font-medium tabular-nums tracking-tight cursor-pointer select-none ${isReady ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-500 dark:text-zinc-400'}`}
                   title="Click to adjust timer"
                 >
                   {isReady ? 'Now' : (
                     timeLeft ? (
                       <div className="flex items-center">
                         <SlidingNumber value={timeLeft.h} padStart />
-                        <span className="mx-[1px]">:</span>
+                        <span className="mx-0.5 text-zinc-300 dark:text-zinc-600">:</span>
                         <SlidingNumber value={timeLeft.m} padStart />
-                        <span className="mx-[1px]" >:</span>
+                        <span className="mx-0.5 text-zinc-300 dark:text-zinc-600">:</span>
                         <SlidingNumber value={timeLeft.s} padStart />
                       </div>
-                    ) : '--:--:--'
+                    ) : '—'
                   )}
                 </div>
               )}
             </div>
           </div>
 
-          <div className="mt-auto space-y-3">
-            {/* Status Messages */}
+          <div className="mt-auto space-y-2.5">
             {isSuccess && (
-                <div className="bg-emerald-500/5 border border-emerald-500/10 rounded px-3 py-2 flex items-center gap-2 text-[11px] text-emerald-400 animate-in fade-in zoom-in-95 duration-300">
-                    <Check size={12} /> Claimed Successfully
-                </div>
+              <div className="flex items-center gap-2 text-[11px] text-emerald-600 dark:text-emerald-400">
+                <Check size={12} /> Claimed
+              </div>
             )}
             
             {isError && profile.message && !profile.message.includes('CORS') && (
-                <div className="bg-red-500/5 border border-red-500/10 rounded px-3 py-2 flex items-center gap-2 text-[11px] text-red-400">
-                    <AlertTriangle size={12} /> {profile.message}
-                </div>
+              <div className="flex items-center gap-2 text-[11px] text-red-500">
+                <AlertTriangle size={12} /> {profile.message}
+              </div>
             )}
 
-            {/* Main Action Button */}
             <button
               onClick={() => onClaim(profile.id)}
               disabled={!isReady || isLoading}
               className={`
-                w-full py-3 rounded-lg text-xs font-bold uppercase tracking-widest transition-all duration-300 flex items-center justify-center gap-2 border
+                w-full py-2.5 rounded-lg text-sm font-semibold transition-colors duration-200 flex items-center justify-center gap-2
                 ${isReady 
-                    ? 'bg-emerald-500 hover:bg-emerald-600 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white border-transparent shadow-[0_0_20px_-5px_rgba(16,185,129,0.4)] hover:shadow-[0_0_25px_-5px_rgba(16,185,129,0.6)] translate-y-0' 
-                    : 'bg-zinc-200/70 dark:bg-zinc-800/50 text-zinc-500 dark:text-zinc-600 border-zinc-300/70 dark:border-white/5 cursor-not-allowed hover:bg-zinc-300/70 dark:hover:bg-zinc-800'
+                    ? 'bg-emerald-500 hover:bg-emerald-600 text-white' 
+                    : 'bg-zinc-100 dark:bg-white/[0.04] text-zinc-400 dark:text-zinc-600 cursor-not-allowed'
                 }
               `}
             >
-               {isReady ? (
-                 <>Claim Credits <Gem size={12} className="animate-pulse" /></>
-               ) : (
-                 <span className="opacity-50">Wait for Timer</span>
-               )}
+              {isReady ? 'Claim gems' : 'Waiting'}
             </button>
           </div>
 
-          {/* Metadata Drawer */}
-          <div className="mt-3 pt-3 border-t border-white/5">
+          <div className="mt-3 pt-3 border-t border-zinc-200/70 dark:border-white/5">
              <button 
                 onClick={() => setShowDetails(!showDetails)}
-                className="w-full flex items-center justify-between text-[10px] font-medium text-zinc-500 dark:text-zinc-600 hover:text-zinc-800 dark:hover:text-zinc-400 transition-colors uppercase tracking-wider"
+                className="w-full flex items-center justify-between text-[11px] font-medium text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
              >
-                <span>Metadata</span>
-                <ChevronDown size={10} className={`transition-transform duration-300 ${showDetails ? 'rotate-180' : ''}`} />
+                <span>Details</span>
+                <ChevronDown size={12} className={`transition-transform duration-200 ${showDetails ? 'rotate-180' : ''}`} />
              </button>
              
-             <div className={`grid transition-[grid-template-rows] duration-300 ease-out ${showDetails ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+             <div className={`grid transition-[grid-template-rows] duration-200 ease-out ${showDetails ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
                 <div className="overflow-hidden">
-                    <div className="mt-3 space-y-1.5 text-[10px]">
-                        <div className="flex justify-between items-center p-1.5 rounded hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors group/copy">
-                            <span className="text-zinc-500">ID</span>
+                    <div className="mt-2.5 space-y-1 text-[11px]">
+                        <div className="flex justify-between items-center py-1.5 group/copy">
+                            <span className="text-zinc-400">ID</span>
                             <div className="flex items-center gap-1.5">
-                                <span className="font-mono text-zinc-400 truncate max-w-[80px]">{data.id}</span>
-                                <button onClick={() => copyToClipboard(data.id)} className="text-zinc-400 dark:text-zinc-600 hover:text-zinc-800 dark:hover:text-white opacity-0 group-hover/copy:opacity-100 transition-opacity">
+                                <span className="font-mono text-zinc-500 dark:text-zinc-400 truncate max-w-[100px]">{data.id}</span>
+                                <button onClick={() => copyToClipboard(data.id || '')} className="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 opacity-0 group-hover/copy:opacity-100 transition-opacity">
                                     {copied ? <Check size={10} className="text-emerald-500" /> : <Copy size={10} />}
                                 </button>
                             </div>
                         </div>
-                        <div className="flex justify-between items-center p-1.5 rounded hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors">
-                            <span className="text-zinc-500">Referral</span>
-                            <div className="flex flex-col items-end">
-                                <span className="text-emerald-500/80 font-mono">{data.referralCode}</span>
-                                <span className="text-[9px] text-zinc-600">{data.referralCodeUses}/{data.referralLimit} Used</span>
-                            </div>
+                        <div className="flex justify-between items-center py-1.5">
+                            <span className="text-zinc-400">Referral</span>
+                            <span className="font-mono text-zinc-500 dark:text-zinc-400">
+                              {data.referralCode}
+                              <span className="text-zinc-400 dark:text-zinc-600 ml-1.5">{data.referralCodeUses}/{data.referralLimit}</span>
+                            </span>
                         </div>
                     </div>
                 </div>
              </div>
           </div>
-
         </div>
       ) : (
-        /* Error / Offline State */
         <div className="flex-1 flex flex-col items-center justify-center text-center p-6">
              {isLoading ? (
-                 // Initial Loading Skeleton
-                 <div className="space-y-3 w-full opacity-50">
-                    <div className="h-16 bg-zinc-100 dark:bg-zinc-800/50 rounded-lg animate-pulse"></div>
-                    <div className="h-8 bg-zinc-100 dark:bg-zinc-800/50 rounded-lg animate-pulse w-2/3 mx-auto"></div>
+                 <div className="space-y-3 w-full opacity-40">
+                    <div className="h-10 bg-zinc-200 dark:bg-zinc-800/50 rounded-md animate-pulse"></div>
+                    <div className="h-8 bg-zinc-200 dark:bg-zinc-800/50 rounded-md animate-pulse w-1/2 mx-auto"></div>
                  </div>
             ) : (
-                 <div className="flex flex-col items-center gap-3 animate-in fade-in zoom-in-95">
-                    {isAuthError ? (
-                      <div className="p-3 bg-amber-500/10 rounded-full text-amber-500 border border-amber-500/20 shadow-[0_0_15px_-3px_rgba(245,158,11,0.2)]">
-                        <Key size={20} />
-                      </div>
-                    ) : (
-                      <div className="p-3 bg-red-500/10 rounded-full text-red-500 border border-red-500/20 shadow-[0_0_15px_-3px_rgba(239,68,68,0.2)]">
-                        <AlertTriangle size={20} />
-                      </div>
-                    )}
+                 <div className="flex flex-col items-center gap-3">
+                    <div className={`w-9 h-9 rounded-full flex items-center justify-center ${isAuthError ? 'bg-amber-500/10 text-amber-600' : 'bg-red-500/10 text-red-500'}`}>
+                      {isAuthError ? <Key size={16} /> : <AlertTriangle size={16} />}
+                    </div>
                     <div className="space-y-1">
-                        <span className="text-sm font-bold text-zinc-800 dark:text-zinc-300 block">
-                          {isAuthError ? "Session Expired" : isError && profile.message?.includes('CORS') ? "CORS Blocked" : "Connection Failed"}
+                        <span className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 block">
+                          {isAuthError ? "Session expired" : isError && profile.message?.includes('CORS') ? "CORS blocked" : "Connection failed"}
                         </span>
-                        <p className="text-[10px] text-zinc-500 max-w-[200px] leading-relaxed">
+                        <p className="text-[11px] text-zinc-500 max-w-[200px] leading-relaxed">
                           {isAuthError 
-                            ? "Signed out or expired on Unlucid. Please update session token."
+                            ? "Update the session token to reconnect."
                             : isError && profile.message?.includes('CORS') 
-                                ? "Cross-Origin Request Blocked." 
+                                ? "Cross-origin request blocked." 
                                 : (profile.message || "Unable to reach server.")}
                         </p>
                     </div>
-                     <div className="flex items-center gap-2 mt-2">
+                     <div className="flex items-center gap-2 mt-1">
                        <button 
                            onClick={(e) => { e.stopPropagation(); onRefresh(profile.id); }}
-                           className="text-[10px] font-semibold bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 transition-all hover:border-zinc-300 dark:hover:border-zinc-500"
+                           className="text-[11px] font-medium text-zinc-600 dark:text-zinc-300 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-white/10 hover:bg-zinc-50 dark:hover:bg-white/5 transition-colors"
                        >
-                           Try Again
+                           Retry
                        </button>
                        <button 
                            onClick={(e) => { 
@@ -708,9 +664,9 @@ export const AccountCard: React.FC<AccountCardProps> = ({
                              setIsEditing(true); 
                              setIsDeletingConfirm(false);
                            }}
-                           className="text-[10px] font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 px-3 py-1.5 rounded-lg border border-emerald-500/20 transition-all hover:border-emerald-500/40"
+                           className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 px-3 py-1.5 rounded-lg hover:bg-emerald-500/10 transition-colors"
                        >
-                           Update Token
+                           Update token
                        </button>
                      </div>
                  </div>

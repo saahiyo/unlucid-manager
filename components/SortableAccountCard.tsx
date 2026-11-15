@@ -55,9 +55,8 @@ export const SortableAccountCard: React.FC<SortableAccountCardProps> = ({
             bg-white/90 dark:bg-zinc-800/90 border border-zinc-200 dark:border-zinc-700
             text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200
             opacity-0 group-hover/sortable:opacity-100 
-            shadow-lg backdrop-blur-sm
-            transition-all duration-200 cursor-grab active:cursor-grabbing
-            hover:scale-110 hover:bg-white dark:hover:bg-zinc-700"
+            backdrop-blur-sm
+            transition-opacity duration-200 cursor-grab active:cursor-grabbing"
           title="Drag to reorder"
         >
           <GripVertical size={14} />

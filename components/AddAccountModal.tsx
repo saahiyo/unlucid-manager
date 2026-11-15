@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, UserPlus, Eye, EyeOff, Clipboard, AlertCircle, Loader2 } from 'lucide-react';
+import { X, Eye, EyeOff, Clipboard, AlertCircle, Loader2 } from 'lucide-react';
 import { parseCookiesInput, getPrimaryToken } from '../cookieUtils';
 
 interface AddAccountModalProps {
@@ -83,7 +83,6 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
       return;
     }
 
-    // Check duplicate session token
     const newCookies = parseCookiesInput(sanitizedToken);
     const parsedPrimaryToken = getPrimaryToken(newCookies);
 
@@ -92,7 +91,7 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
         t => t.token && (t.token === parsedPrimaryToken || t.token.includes(parsedPrimaryToken) || parsedPrimaryToken.includes(t.token))
       );
       if (duplicate) {
-        setError(`This session token is already in use by account "${duplicate.name}". Duplicate accounts are not allowed.`);
+        setError(`This session token is already in use by account "${duplicate.name}".`);
         return;
       }
     }
@@ -112,47 +111,35 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div 
-        className="w-full max-w-md bg-[#f2f3f5] dark:bg-[#121214] border border-zinc-300/80 dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+        className="w-full max-w-md bg-[#f2f3f5] dark:bg-[#121214] border border-zinc-300/70 dark:border-white/10 rounded-2xl shadow-xl overflow-hidden"
         onKeyDown={(e) => {
           if (e.key === 'Escape') onClose();
         }}
       >
-        {/* Header */}
-        <div className="p-5 border-b border-zinc-200 dark:border-white/5 flex justify-between items-center bg-gradient-to-b from-zinc-50 to-white dark:from-white/[0.03] dark:to-transparent">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shadow-inner">
-              <UserPlus size={18} />
-            </div>
-            <div>
-              <h3 className="text-base font-bold text-zinc-900 dark:text-white leading-tight">Add Account</h3>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Connect a new session token</p>
-            </div>
+        <div className="px-5 py-4 border-b border-zinc-200/80 dark:border-white/5 flex justify-between items-center">
+          <div>
+            <h3 className="text-sm font-semibold text-zinc-900 dark:text-white">Add account</h3>
+            <p className="text-xs text-zinc-500 mt-0.5">Paste a session token to connect</p>
           </div>
-
           <button
             onClick={onClose}
             className="p-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/5 rounded-lg transition-colors"
           >
-            <X size={18} />
+            <X size={16} />
           </button>
         </div>
 
-        {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          {/* Account Name */}
           <div>
-            <div className="flex justify-between items-center mb-1.5">
-              <label className="text-xs font-bold text-zinc-600 dark:text-zinc-300 uppercase tracking-wider">
-                Account Name
-              </label>
-              <span className="text-[10px] text-zinc-400">Auto-detected if left default</span>
-            </div>
+            <label className="block text-[11px] font-medium text-zinc-500 mb-1.5">
+              Name
+            </label>
             <input
               type="text"
               value={name}
@@ -160,90 +147,75 @@ export const AddAccountModal: React.FC<AddAccountModalProps> = ({
                 setName(e.target.value);
                 if (error) setError(null);
               }}
-              placeholder={suggestedName || "e.g. Saahiyo, Main, Farming..."}
-              className="w-full px-3.5 py-2.5 text-sm bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
+              placeholder={suggestedName || "Account name"}
+              className="w-full px-3 py-2.5 text-sm bg-white/70 dark:bg-black/30 border border-zinc-200 dark:border-white/10 rounded-lg text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-emerald-500/60 transition-colors"
               autoFocus
             />
           </div>
 
-          {/* Session Token / Cookies */}
           <div>
             <div className="flex justify-between items-center mb-1.5">
-              <label className="text-xs font-bold text-zinc-600 dark:text-zinc-300 uppercase tracking-wider">
-                Session Token / Cookies / Curl
+              <label className="text-[11px] font-medium text-zinc-500">
+                Session token
               </label>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={handlePasteClipboard}
-                  className="text-xs text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 font-medium flex items-center gap-1 transition-colors"
-                  title="Paste from clipboard"
+                  className="text-[11px] text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 font-medium flex items-center gap-1 transition-colors"
                 >
-                  <Clipboard size={12} />
+                  <Clipboard size={11} />
                   Paste
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowToken(!showToken)}
-                  className="text-xs text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 font-medium flex items-center gap-1 transition-colors"
+                  className="text-[11px] text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 font-medium flex items-center gap-1 transition-colors"
                 >
-                  {showToken ? <><EyeOff size={12} /> Hide</> : <><Eye size={12} /> Show</>}
+                  {showToken ? <><EyeOff size={11} /> Hide</> : <><Eye size={11} /> Show</>}
                 </button>
               </div>
             </div>
 
-            <div className="relative">
-              <input
-                type={showToken ? "text" : "password"}
-                value={token}
-                onChange={(e) => {
-                  setToken(e.target.value);
-                  if (error) setError(null);
-                }}
-                placeholder="Paste token, cookie string, or full curl command..."
-                className="w-full px-3.5 py-2.5 text-sm font-mono bg-zinc-50 dark:bg-black/40 border border-zinc-200 dark:border-white/10 rounded-xl text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
-              />
-            </div>
-            <p className="text-[11px] text-zinc-400 mt-1">
-              Supports Better-Auth token, Auth.js token, or full DevTools curl.
-            </p>
-            <div className="mt-2 p-2 rounded-lg bg-emerald-500/5 border border-emerald-500/10 text-[11px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
-              <span>✨ Google profile name, Gmail, and avatar are automatically detected.</span>
-            </div>
+            <input
+              type={showToken ? "text" : "password"}
+              value={token}
+              onChange={(e) => {
+                setToken(e.target.value);
+                if (error) setError(null);
+              }}
+              placeholder="Token, cookie string, or curl…"
+              className="w-full px-3 py-2.5 text-sm font-mono bg-white/70 dark:bg-black/30 border border-zinc-200 dark:border-white/10 rounded-lg text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:border-emerald-500/60 transition-colors"
+            />
           </div>
 
-          {/* Error Message */}
           {error && (
-            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-500 dark:text-red-400 flex items-center gap-2 animate-in fade-in duration-150">
-              <AlertCircle size={15} className="shrink-0" />
+            <div className="text-xs text-red-500 flex items-center gap-2">
+              <AlertCircle size={13} className="shrink-0" />
               <span>{error}</span>
             </div>
           )}
 
-          {/* Footer Buttons */}
-          <div className="pt-2 flex items-center justify-end gap-2.5">
+          <div className="pt-1 flex items-center justify-end gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white rounded-xl hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors"
+              className="px-3.5 py-2 text-xs font-medium text-zinc-500 hover:text-zinc-800 dark:hover:text-white rounded-lg transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40 transition-all flex items-center gap-2 disabled:opacity-50"
+              className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-semibold transition-colors flex items-center gap-2 disabled:opacity-50"
             >
               {isSubmitting ? (
                 <>
-                  <Loader2 size={14} className="animate-spin" />
-                  Connecting...
+                  <Loader2 size={13} className="animate-spin" />
+                  Connecting…
                 </>
               ) : (
-                <>
-                  <UserPlus size={14} />
-                  Add Account
-                </>
+                'Add account'
               )}
             </button>
           </div>

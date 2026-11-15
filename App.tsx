@@ -4,9 +4,8 @@ import { URL_ACCOUNT, URL_CLAIM, URL_BOTH } from './config';
 import { ThemeProvider } from './components/ThemeProvider';
 import { ThemeToggle } from './components/ThemeToggle';
 
-import { Diamond, Layers, LogOut, RefreshCw, Zap, Import, Download, Sparkles, Volume2, VolumeX, Plus, ArrowUpDown, AlertTriangle, MoreHorizontal } from 'lucide-react';
+import { Diamond, Layers, RefreshCw, Zap, Import, Download, Sparkles, Volume2, VolumeX, Plus, ArrowUpDown, AlertTriangle, MoreHorizontal } from 'lucide-react';
 
-import { DrawingCursor } from './components/DrawingCursor';
 import { Preloader } from './components/Preloader';
 import { CookieImportModal } from './components/CookieImportModal';
 import { AddAccountModal } from './components/AddAccountModal';
@@ -34,7 +33,8 @@ type FilterOption = 'all' | 'valid' | 'ready' | 'offline';
 function App() {
   const [profiles, setProfiles] = useState<ProfileState[]>([]);
   const [globalLoading, setGlobalLoading] = useState(false);
-  const [initialLoading, setInitialLoading] = useState(true);
+  const [showPreloader, setShowPreloader] = useState(true);
+  const [accountsReady, setAccountsReady] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
@@ -167,8 +167,7 @@ function App() {
       if (Object.keys(deduplicatedCookies).length > 0) {
         handleLoadCookies(deduplicatedCookies);
       } else {
-        // console.warn('No cookies found.');
-        setInitialLoading(false);
+        setAccountsReady(true);
       }
     };
 
@@ -452,7 +451,7 @@ function App() {
     setProfiles(newProfiles);
     // Automatically fetch data for new profiles
     await Promise.all(newProfiles.map(p => fetchAccountData(p.id, p.config.cookies)));
-    setInitialLoading(false);
+    setAccountsReady(true);
   };
 
   const fetchAccountData = async (id: string, cookies?: Record<string, string>) => {
@@ -948,32 +947,32 @@ function App() {
   return (
     <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
     <div className="min-h-screen bg-[#e8eaee] dark:bg-[#09090b] text-zinc-900 dark:text-white font-sans pb-28 relative selection:bg-emerald-500/30 transition-colors duration-300">
-      {initialLoading && <Preloader onFinish={() => setInitialLoading(false)} isLoading={initialLoading} />}
-      <DrawingCursor />
+      {showPreloader && (
+        <Preloader
+          isLoading={!accountsReady}
+          onFinish={() => setShowPreloader(false)}
+        />
+      )}
       
-      {/* Background Effects */}
-      <div className="fixed inset-0 bg-grid-pattern z-0 opacity-[0.55] dark:opacity-40 pointer-events-none invert dark:invert-0"></div>
-      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[800px] h-[420px] bg-emerald-500/15 dark:bg-emerald-900/10 blur-[120px] rounded-full z-0 pointer-events-none"></div>
-      <div className="fixed bottom-0 right-0 w-[480px] h-[320px] bg-sky-400/10 dark:bg-transparent blur-[100px] rounded-full z-0 pointer-events-none"></div>
+      {/* Background */}
+      <div className="fixed inset-0 bg-grid-pattern z-0 opacity-40 dark:opacity-30 pointer-events-none invert dark:invert-0"></div>
+      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[720px] h-[360px] bg-emerald-500/10 dark:bg-emerald-900/10 blur-[110px] rounded-full z-0 pointer-events-none"></div>
 
       {/* Max-width shell */}
       <div className="relative z-10 mx-auto w-full max-w-6xl px-3 sm:px-6">
 
       {/* Header */}
       <header className="sticky top-3 sm:top-4 z-40 pt-1">
-        <div className="bg-white/55 dark:bg-[#121214]/70 backdrop-blur-3xl border border-zinc-300/70 dark:border-white/10 rounded-2xl shadow-lg shadow-zinc-400/15 dark:shadow-2xl flex items-center justify-between gap-3 px-3.5 sm:px-5 h-14 sm:h-16 transition-colors duration-300">
+        <div className="bg-white/60 dark:bg-[#121214]/75 backdrop-blur-2xl border border-zinc-300/60 dark:border-white/10 rounded-2xl flex items-center justify-between gap-3 px-3.5 sm:px-5 h-14 sm:h-16 transition-colors duration-300">
             
             {/* Logo Area */}
             <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-                <div className="relative shrink-0">
-                    <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center shadow-[0_0_15px_rgba(16,185,129,0.4)]">
-                        <Diamond size={16} className="text-black fill-current" />
-                    </div>
-                    <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-white rounded-full animate-pulse"></div>
+                <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center shrink-0">
+                    <Diamond size={15} className="text-black fill-current" />
                 </div>
                 <div className="min-w-0">
-                    <h1 className="text-sm font-bold tracking-tight text-zinc-900 dark:text-white leading-none truncate">UNLUCID<span className="text-zinc-400 dark:text-zinc-500 font-light ml-1">MANAGER</span></h1>
-                    <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono tracking-wider mt-0.5 hidden min-[380px]:block">V2.0 DASHBOARD</p>
+                    <h1 className="text-sm font-semibold tracking-tight text-zinc-900 dark:text-white leading-none truncate">Unlucid<span className="text-zinc-400 dark:text-zinc-500 font-medium ml-1">Manager</span></h1>
+                    <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono tracking-wide mt-0.5 hidden min-[380px]:block">v2.0</p>
                 </div>
             </div>
 
@@ -1008,11 +1007,8 @@ function App() {
                 {profiles.length}
               </span>
               {autoClaimEnabled && (
-                <span className="ml-1 inline-flex items-center gap-1.5 text-[10px] font-mono font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
-                  <span className="relative flex h-1.5 w-1.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
-                  </span>
+                <span className="ml-1 inline-flex items-center gap-1.5 text-[10px] font-mono font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                   Auto{autoClaimCount > 0 ? ` · ${autoClaimCount}` : ''}
                 </span>
               )}
@@ -1117,15 +1113,7 @@ function App() {
                   }`}
                   title={autoClaimEnabled ? "Auto-Claim is Active" : "Turn On Auto-Claim"}
                 >
-                  <div className="relative flex items-center justify-center">
-                    <Sparkles size={13} className={autoClaimEnabled ? "text-emerald-500 animate-pulse" : "text-zinc-400"} />
-                    {autoClaimEnabled && (
-                      <span className="absolute -top-1 -right-1 flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                      </span>
-                    )}
-                  </div>
+                  <Sparkles size={13} className={autoClaimEnabled ? "text-emerald-500" : "text-zinc-400"} />
                   <span>Auto <strong className={autoClaimEnabled ? "text-emerald-600 dark:text-emerald-400" : "text-zinc-500"}>{autoClaimEnabled ? "ON" : "OFF"}</strong></span>
                 </button>
 
@@ -1243,43 +1231,39 @@ function App() {
 
         {/* Grid */}
         {profiles.length === 0 ? (
-          <div className="border border-dashed border-zinc-400/60 dark:border-zinc-800 rounded-3xl p-16 text-center bg-white/40 dark:bg-black/20 backdrop-blur-sm">
-            <div className="w-20 h-20 bg-zinc-200/80 dark:bg-zinc-900/80 rounded-3xl flex items-center justify-center mx-auto mb-6 text-zinc-400 dark:text-zinc-700 shadow-inner border border-zinc-300/80 dark:border-white/5">
-              <LogOut size={32} />
-            </div>
-            <h3 className="text-xl font-bold text-zinc-900 dark:text-white mb-2">No accounts active</h3>
-            <p className="text-zinc-500 max-w-sm mx-auto mb-8 text-sm leading-relaxed">
-              Get started by importing your session cookies. <br/>
-              <span className="text-xs text-zinc-600 mt-2 block">Use the extension to export your profiles or add them manually.</span>
+          <div className="rounded-2xl border border-zinc-300/50 dark:border-white/10 bg-white/50 dark:bg-white/[0.02] px-6 py-16 text-center">
+            <h3 className="text-base font-semibold text-zinc-900 dark:text-white tracking-tight">No accounts yet</h3>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-2 max-w-xs mx-auto">
+              Add a session token to start tracking gems.
             </p>
-            <div className="flex flex-wrap items-center justify-center gap-3">
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-2.5">
               <button 
                 onClick={() => setIsAddModalOpen(true)}
-                className="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40 transition-all flex items-center gap-2"
+                className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-sm font-semibold transition-colors flex items-center gap-2"
               >
-                <Plus size={16} />
-                Add Account
+                <Plus size={15} />
+                Add account
               </button>
               <button 
                 onClick={() => setIsImportModalOpen(true)}
-                className="px-6 py-3 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-800 dark:text-white rounded-xl text-sm font-bold transition-all flex items-center gap-2"
+                className="px-4 py-2.5 text-sm font-medium text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white rounded-lg border border-zinc-300/70 dark:border-white/10 hover:bg-zinc-100/80 dark:hover:bg-white/5 transition-colors flex items-center gap-2"
               >
-                <Import size={16} />
-                Import Cookies
+                <Import size={15} />
+                Import
               </button>
             </div>
           </div>
         ) : sortedProfiles.length === 0 ? (
-          <div className="border border-dashed border-zinc-400/60 dark:border-zinc-800 rounded-3xl p-12 text-center bg-white/40 dark:bg-black/20 backdrop-blur-sm">
-            <p className="text-zinc-500 text-sm mb-3">No {filterBy} accounts found.</p>
+          <div className="rounded-2xl border border-zinc-300/50 dark:border-white/10 bg-white/50 dark:bg-white/[0.02] px-6 py-12 text-center">
+            <p className="text-sm text-zinc-500 mb-4">No {filterBy} accounts found.</p>
             <button
               onClick={() => {
                 setFilterBy('all');
                 localStorage.setItem('unlucid_filter_by', 'all');
               }}
-              className="px-4 py-2 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-800 dark:text-white rounded-lg text-xs font-semibold transition-all"
+              className="text-sm font-medium text-emerald-600 dark:text-emerald-400 hover:underline"
             >
-              Show All Accounts
+              Show all
             </button>
           </div>
         ) : (
@@ -1312,8 +1296,8 @@ function App() {
       </main>
 
       <footer className="pb-8 pt-2 text-center">
-        <p className="text-[10px] text-zinc-500 dark:text-zinc-600 font-mono tracking-widest uppercase">
-          Unlucid Manager v2.0 • <span className="text-zinc-400 dark:text-zinc-500">System Active</span>
+        <p className="text-[10px] text-zinc-400 dark:text-zinc-600 font-mono tracking-wide">
+          Unlucid Manager v2.0
         </p>
       </footer>
 

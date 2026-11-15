@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Diamond } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface PreloaderProps {
   onFinish: () => void;
@@ -7,57 +8,62 @@ interface PreloaderProps {
 }
 
 export const Preloader: React.FC<PreloaderProps> = ({ onFinish, isLoading }) => {
-  const [exiting, setExiting] = useState(false);
+  const [visible, setVisible] = useState(true);
   const [minTimeElapsed, setMinTimeElapsed] = useState(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setMinTimeElapsed(true);
-    }, 2000); // Show for at least 2 seconds
-
+    const timer = setTimeout(() => setMinTimeElapsed(true), 1400);
     return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
-    if (!isLoading && minTimeElapsed && !exiting) {
-        setExiting(true);
-        setTimeout(onFinish, 500); // Wait for exit animation
+    if (!isLoading && minTimeElapsed && visible) {
+      const exitTimer = setTimeout(() => setVisible(false), 120);
+      return () => clearTimeout(exitTimer);
     }
-  }, [isLoading, minTimeElapsed, onFinish, exiting]);
-
-  if (exiting) {
-      return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#09090b] transition-opacity duration-500 opacity-0 pointer-events-none">
-             <div className="relative flex flex-col items-center">
-                <div className="w-16 h-16 bg-emerald-500 rounded-2xl flex items-center justify-center shadow-[0_0_30px_rgba(16,185,129,0.4)] animate-pulse">
-                    <Diamond size={32} className="text-black fill-current" />
-                </div>
-            </div>
-        </div>
-      )
-  }
+  }, [isLoading, minTimeElapsed, visible]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#09090b]">
-      <div className="relative flex flex-col items-center gap-6">
-        <div className="relative">
-            <div className="w-16 h-16 bg-emerald-500 rounded-2xl flex items-center justify-center shadow-[0_0_30px_rgba(16,185,129,0.4)] animate-bounce">
-                <Diamond size={32} className="text-black fill-current" />
+    <AnimatePresence onExitComplete={onFinish}>
+      {visible && (
+        <motion.div
+          key="preloader"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-[#e8eaee] dark:bg-[#09090b]"
+          initial={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <motion.div
+            className="flex flex-col items-center gap-5"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <div className="w-11 h-11 bg-emerald-500 rounded-xl flex items-center justify-center">
+              <Diamond size={20} className="text-black fill-current" />
             </div>
-            <div className="absolute -top-2 -right-2 w-4 h-4 bg-white rounded-full animate-ping"></div>
-        </div>
-        
-        <div className="flex flex-col items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight text-white leading-none">
-                UNLUCID<span className="text-zinc-500 font-light ml-1">MANAGER</span>
-            </h1>
-            <div className="flex gap-1">
-                <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-                <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-                <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce"></div>
+
+            <div className="flex flex-col items-center gap-2.5">
+              <h1 className="text-sm font-semibold tracking-[0.22em] uppercase text-zinc-900 dark:text-zinc-100">
+                Unlucid
+              </h1>
+              <div className="w-8 h-px bg-zinc-300 dark:bg-zinc-700 overflow-hidden">
+                <motion.div
+                  className="h-full bg-emerald-500"
+                  initial={{ x: '-100%' }}
+                  animate={{ x: '100%' }}
+                  transition={{
+                    duration: 1.1,
+                    repeat: Infinity,
+                    ease: [0.4, 0, 0.2, 1],
+                  }}
+                />
+              </div>
             </div>
-        </div>
-      </div>
-    </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 };

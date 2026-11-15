@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Plus, Trash2, Save, Import, FileJson } from 'lucide-react';
+import { X, Plus, Trash2, FileJson } from 'lucide-react';
 import { getPrimaryToken, parseCookiesInput } from '../cookieUtils';
 
 interface CookieImportModalProps {
@@ -36,10 +36,7 @@ export function CookieImportModal({ isOpen, onClose, onSave, initialData = [] }:
   };
 
   const handleSave = () => {
-    // Filter out empty rows
     const validAccounts = accounts.filter(a => a.name.trim() !== '' && a.token.trim() !== '');
-
-    // Deduplicate accounts by primary token so no two rows have the same session token
     const seenTokens = new Set<string>();
     const deduplicated: { name: string; token: string }[] = [];
 
@@ -56,8 +53,6 @@ export function CookieImportModal({ isOpen, onClose, onSave, initialData = [] }:
     onClose();
   };
 
-
-
   const handleImportClick = () => {
     fileInputRef.current?.click();
   };
@@ -71,8 +66,6 @@ export function CookieImportModal({ isOpen, onClose, onSave, initialData = [] }:
       try {
         const content = e.target?.result as string;
         const parsed = JSON.parse(content);
-        
-        // Convert from RawCookiesJson to our internal format
         const newAccounts: { name: string; token: string; id: string }[] = [];
         
         Object.entries(parsed).forEach(([name, cookies]: [string, any], index) => {
@@ -89,24 +82,19 @@ export function CookieImportModal({ isOpen, onClose, onSave, initialData = [] }:
         });
 
         if (newAccounts.length > 0) {
-            // Append to existing or replace? Let's append for now, but if the first row is empty, replace it.
             setAccounts(prev => {
                 const hasEmptyStart = prev.length === 1 && prev[0].name === '' && prev[0].token === '';
-                if (hasEmptyStart) {
-                    return newAccounts;
-                }
+                if (hasEmptyStart) return newAccounts;
                 return [...prev, ...newAccounts];
             });
         } else {
             alert("No valid cookies found in the file.");
         }
-
       } catch (err) {
         console.error("Failed to parse JSON", err);
         alert("Invalid JSON file");
       }
       
-      // Reset input
       if (fileInputRef.current) fileInputRef.current.value = '';
     };
     reader.readAsText(file);
@@ -115,28 +103,25 @@ export function CookieImportModal({ isOpen, onClose, onSave, initialData = [] }:
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="w-full max-w-3xl bg-[#f2f3f5] dark:bg-[#121214] rounded-2xl shadow-2xl border border-zinc-300/80 dark:border-zinc-800 flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className="w-full max-w-2xl bg-[#f2f3f5] dark:bg-[#121214] rounded-2xl shadow-xl border border-zinc-300/70 dark:border-white/10 flex flex-col max-h-[85vh]">
         
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-zinc-100 dark:border-zinc-800">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-200/80 dark:border-white/5">
           <div>
-            <h2 className="text-xl font-bold text-zinc-900 dark:text-white flex items-center gap-2">
-              <Import size={20} className="text-emerald-500" />
-              Import Cookies
+            <h2 className="text-sm font-semibold text-zinc-900 dark:text-white">
+              Import accounts
             </h2>
-            <p className="text-sm text-zinc-500 mt-1">
-              Add your accounts by providing a name and the <code className="bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded text-xs font-mono text-emerald-600 dark:text-emerald-400">__Secure-authjs.session-token</code> cookie value.
+            <p className="text-xs text-zinc-500 mt-0.5">
+              Name + session token per row
             </p>
           </div>
-          <div className="flex items-center gap-2">
-
+          <div className="flex items-center gap-1">
             <button 
                 onClick={handleImportClick}
-                className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors text-zinc-500 hover:text-emerald-600 dark:hover:text-emerald-400"
+                className="p-2 hover:bg-zinc-100 dark:hover:bg-white/5 rounded-lg transition-colors text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
                 title="Import from JSON"
             >
-                <FileJson size={20} />
+                <FileJson size={16} />
             </button>
             <input 
                 type="file" 
@@ -145,86 +130,79 @@ export function CookieImportModal({ isOpen, onClose, onSave, initialData = [] }:
                 accept=".json" 
                 className="hidden" 
             />
-            <div className="w-px h-6 bg-zinc-200 dark:bg-zinc-800 mx-1"></div>
             <button 
                 onClick={onClose}
-                className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors text-zinc-500 hover:text-zinc-900 dark:hover:text-white"
+                className="p-2 hover:bg-zinc-100 dark:hover:bg-white/5 rounded-lg transition-colors text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
             >
-                <X size={20} />
+                <X size={16} />
             </button>
           </div>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
-          <div className="space-y-4">
-            {/* Table Header */}
-            <div className="grid grid-cols-12 gap-4 px-2 text-xs font-bold text-zinc-500 uppercase tracking-wider">
+        <div className="flex-1 overflow-y-auto p-5">
+          <div className="space-y-3">
+            <div className="grid grid-cols-12 gap-3 px-1 text-[10px] font-medium text-zinc-400 uppercase tracking-wide">
               <div className="col-span-3">Name</div>
-              <div className="col-span-8">Session Token</div>
+              <div className="col-span-8">Token</div>
               <div className="col-span-1"></div>
             </div>
 
-            {/* Rows */}
-            <div className="space-y-3">
+            <div className="space-y-2">
               {accounts.map((account) => (
-                <div key={account.id} className="grid grid-cols-12 gap-4 items-start group">
+                <div key={account.id} className="grid grid-cols-12 gap-3 items-center">
                   <div className="col-span-3">
                     <input
                       type="text"
-                      placeholder="Account Name"
+                      placeholder="Name"
                       value={account.name}
                       onChange={(e) => handleChange(account.id, 'name', e.target.value)}
-                      className="w-full px-3 py-2.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-zinc-900 dark:text-white placeholder:text-zinc-400"
+                      className="w-full px-3 py-2 bg-white/70 dark:bg-black/30 border border-zinc-200 dark:border-white/10 rounded-lg text-sm focus:outline-none focus:border-emerald-500/60 transition-colors text-zinc-900 dark:text-white placeholder:text-zinc-400"
                     />
                   </div>
                   <div className="col-span-8">
                     <input
                       type="text"
-                      placeholder="Paste __Secure-authjs.session-token here..."
+                      placeholder="Session token"
                       value={account.token}
                       onChange={(e) => handleChange(account.id, 'token', e.target.value)}
-                      className="w-full px-3 py-2.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all text-zinc-900 dark:text-white placeholder:text-zinc-400"
+                      className="w-full px-3 py-2 bg-white/70 dark:bg-black/30 border border-zinc-200 dark:border-white/10 rounded-lg text-sm font-mono focus:outline-none focus:border-emerald-500/60 transition-colors text-zinc-900 dark:text-white placeholder:text-zinc-400"
                     />
                   </div>
-                  <div className="col-span-1 flex justify-center pt-2">
+                  <div className="col-span-1 flex justify-center">
                     <button
                       onClick={() => handleRemoveRow(account.id)}
                       className="text-zinc-400 hover:text-red-500 transition-colors p-1"
                       title="Remove row"
                     >
-                      <Trash2 size={16} />
+                      <Trash2 size={14} />
                     </button>
                   </div>
                 </div>
               ))}
             </div>
 
-            {/* Empty State / Add Button */}
             <button
               onClick={handleAddRow}
-              className="w-full py-3 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl flex items-center justify-center gap-2 text-zinc-500 hover:text-emerald-600 dark:hover:text-emerald-400 hover:border-emerald-500/30 hover:bg-emerald-50/50 dark:hover:bg-emerald-900/10 transition-all text-sm font-medium group"
+              className="w-full py-2.5 border border-dashed border-zinc-300 dark:border-white/10 rounded-lg flex items-center justify-center gap-2 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 hover:border-zinc-400 dark:hover:border-white/20 transition-colors text-xs font-medium"
             >
-              <Plus size={16} className="group-hover:scale-110 transition-transform" />
-              Add Another Account
+              <Plus size={14} />
+              Add row
             </button>
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="p-6 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 rounded-b-2xl flex justify-end gap-3">
+        <div className="px-5 py-4 border-t border-zinc-200/80 dark:border-white/5 flex justify-end gap-2">
           <button
             onClick={onClose}
-            className="px-5 py-2.5 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
+            className="px-3.5 py-2 text-xs font-medium text-zinc-500 hover:text-zinc-800 dark:hover:text-white rounded-lg transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
-            className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold rounded-lg shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40 transition-all flex items-center gap-2"
+            className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold rounded-lg transition-colors"
           >
-            <Save size={16} />
-            Save & Import
+            Save import
           </button>
         </div>
       </div>
