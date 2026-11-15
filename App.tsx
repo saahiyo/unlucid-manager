@@ -774,7 +774,7 @@ function App() {
       <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[720px] h-[360px] bg-emerald-500/10 dark:bg-emerald-900/10 blur-[110px] rounded-full z-0 pointer-events-none"></div>
 
       {/* Max-width shell */}
-      <div className="relative z-10 mx-auto w-full max-w-6xl px-3 sm:px-6">
+      <div className="relative z-10 mx-auto w-full max-w-6xl px-4 sm:px-6">
 
       {/* Header */}
       <header className="sticky top-3 sm:top-4 z-40 pt-1">
@@ -810,27 +810,27 @@ function App() {
       </header>
 
       {/* Main Content */}
-      <main className="py-3 sm:py-8">
+      <main className="py-5 sm:py-8">
         
-        {/* Toolbar — compact on mobile, one row on desktop */}
-        <div className="flex flex-col gap-2 mb-3 sm:mb-6 md:flex-row md:items-center md:justify-between md:gap-4">
+        {/* Toolbar — compact controls, normal spacing */}
+        <div className="flex flex-col gap-3 mb-5 sm:mb-6 md:flex-row md:items-center md:justify-between md:gap-4">
           {/* Title + filters */}
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3 min-w-0">
-            <h2 className="text-sm sm:text-lg font-bold text-zinc-900 dark:text-white flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 min-w-0">
+            <h2 className="text-base sm:text-lg font-bold text-zinc-900 dark:text-white flex items-center gap-2 shrink-0">
               Accounts
-              <span className="flex items-center justify-center w-5 h-5 sm:w-6 sm:h-6 text-[10px] bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 rounded-full border border-zinc-200 dark:border-zinc-700">
+              <span className="flex items-center justify-center w-6 h-6 text-[10px] bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 rounded-full border border-zinc-200 dark:border-zinc-700">
                 {profiles.length}
               </span>
             </h2>
 
             <div className="flex items-center overflow-x-auto no-scrollbar max-w-full">
-              <div className="flex items-center bg-zinc-200/60 dark:bg-black/30 p-0.5 sm:p-1 rounded-lg sm:rounded-xl border border-zinc-300/70 dark:border-white/5 text-[11px] sm:text-xs shrink-0">
+              <div className="flex items-center bg-zinc-200/60 dark:bg-black/30 p-1 rounded-xl border border-zinc-300/70 dark:border-white/5 text-xs shrink-0">
                 <button
                   onClick={() => {
                     setFilterBy('all');
                     localStorage.setItem('unlucid_filter_by', 'all');
                   }}
-                  className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-md sm:rounded-lg font-semibold transition-all ${
+                  className={`px-3 py-1.5 rounded-lg font-semibold transition-all ${
                     filterBy === 'all'
                       ? 'bg-white/90 dark:bg-zinc-800 text-zinc-900 dark:text-white shadow-sm'
                       : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
@@ -843,7 +843,7 @@ function App() {
                     setFilterBy('valid');
                     localStorage.setItem('unlucid_filter_by', 'valid');
                   }}
-                  className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-md sm:rounded-lg font-semibold transition-all flex items-center gap-1 sm:gap-1.5 ${
+                  className={`px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1.5 ${
                     filterBy === 'valid'
                       ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/20'
                       : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
@@ -859,7 +859,7 @@ function App() {
                       setFilterBy('ready');
                       localStorage.setItem('unlucid_filter_by', 'ready');
                     }}
-                    className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-md sm:rounded-lg font-semibold transition-all flex items-center gap-1 sm:gap-1.5 ${
+                    className={`px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1.5 ${
                       filterBy === 'ready'
                         ? 'bg-amber-500 text-white shadow-sm shadow-amber-500/20'
                         : 'text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200'
@@ -875,7 +875,7 @@ function App() {
                       setFilterBy('offline');
                       localStorage.setItem('unlucid_filter_by', 'offline');
                     }}
-                    className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-md sm:rounded-lg font-semibold transition-all flex items-center gap-1 sm:gap-1.5 ${
+                    className={`px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1.5 ${
                       filterBy === 'offline'
                         ? 'bg-red-500/90 text-white shadow-sm'
                         : 'text-zinc-400 hover:text-red-500'
@@ -890,10 +890,10 @@ function App() {
             </div>
           </div>
 
-          {/* Controls — one compact row on mobile */}
-          <div className="flex items-center gap-1.5 sm:gap-2 w-full md:w-auto shrink-0">
-            <div className="flex items-center gap-1 min-h-8 sm:min-h-10 flex-1 md:flex-none md:w-auto bg-white/70 dark:bg-zinc-900 border border-zinc-300/80 dark:border-zinc-800 rounded-lg px-2 sm:px-2.5 text-[11px] sm:text-xs text-zinc-600 dark:text-zinc-300 shadow-sm dark:shadow-none">
-              <ArrowUpDown size={12} className="text-zinc-400 shrink-0" />
+          {/* Controls — one row on mobile, normal tap targets */}
+          <div className="flex items-center gap-2 w-full md:w-auto shrink-0">
+            <div className="flex items-center gap-1.5 min-h-10 flex-1 md:flex-none md:w-auto bg-white/70 dark:bg-zinc-900 border border-zinc-300/80 dark:border-zinc-800 rounded-lg px-2.5 text-xs text-zinc-600 dark:text-zinc-300 shadow-sm dark:shadow-none">
+              <ArrowUpDown size={13} className="text-zinc-400 shrink-0" />
               <select
                 value={sortBy}
                 onChange={(e) => {
@@ -901,7 +901,7 @@ function App() {
                   setSortBy(val);
                   localStorage.setItem('unlucid_sort_by', val);
                 }}
-                className="w-full md:w-auto bg-transparent border-none text-[11px] sm:text-xs font-semibold text-zinc-800 dark:text-zinc-200 focus:outline-none cursor-pointer"
+                className="w-full md:w-auto bg-transparent border-none text-xs font-semibold text-zinc-800 dark:text-zinc-200 focus:outline-none cursor-pointer"
                 aria-label="Sort accounts"
               >
                 <option value="valid_first" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white">Valid first</option>
@@ -914,13 +914,13 @@ function App() {
             <button 
               onClick={handleClaimAll}
               disabled={profiles.length === 0 || readyToClaim === 0 || globalLoading}
-              className={`min-h-8 sm:min-h-10 px-2.5 sm:px-3.5 rounded-lg text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center gap-1 sm:gap-1.5 shadow-sm shrink-0 ${
+              className={`min-h-10 px-3 sm:px-3.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm shrink-0 ${
                 profiles.length > 0 && readyToClaim > 0 
                   ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/20' 
                   : 'bg-zinc-200/80 dark:bg-zinc-900 text-zinc-500 dark:text-zinc-600 border border-zinc-300/80 dark:border-zinc-800 cursor-not-allowed'
               }`}
             >
-              {globalLoading ? <Zap className="animate-spin" size={12}/> : <Layers size={12} />}
+              {globalLoading ? <Zap className="animate-spin" size={13}/> : <Layers size={13} />}
               <span className="hidden min-[380px]:inline">Claim All</span>
               <span className="min-[380px]:hidden">Claim</span>
               {readyToClaim > 0 ? ` (${readyToClaim})` : ''}
@@ -928,9 +928,9 @@ function App() {
 
             <button 
               onClick={() => setIsAddModalOpen(true)}
-              className="min-h-8 sm:min-h-10 px-2.5 sm:px-3.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-[11px] sm:text-xs font-bold transition-all flex items-center justify-center gap-1 sm:gap-1.5 shadow-sm shadow-emerald-500/20 shrink-0"
+              className="min-h-10 px-3 sm:px-3.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm shadow-emerald-500/20 shrink-0"
             >
-              <Plus size={13} />
+              <Plus size={14} />
               Add
             </button>
 
@@ -938,7 +938,7 @@ function App() {
               <button
                 type="button"
                 onClick={() => setIsMoreMenuOpen(prev => !prev)}
-                className={`min-h-8 min-w-8 sm:min-h-10 sm:min-w-10 flex items-center justify-center rounded-lg border text-xs font-bold transition-all shadow-sm ${
+                className={`min-h-10 min-w-10 flex items-center justify-center rounded-lg border text-xs font-bold transition-all shadow-sm ${
                   isMoreMenuOpen
                     ? 'bg-zinc-200 dark:bg-zinc-800 border-zinc-400 dark:border-zinc-600 text-zinc-900 dark:text-white'
                     : 'bg-white/70 dark:bg-zinc-900 border-zinc-300/80 dark:border-zinc-800 text-zinc-600 dark:text-zinc-300'
@@ -946,7 +946,7 @@ function App() {
                 aria-label="More actions"
                 aria-expanded={isMoreMenuOpen}
               >
-                <MoreHorizontal size={15} />
+                <MoreHorizontal size={16} />
               </button>
 
                 {isMoreMenuOpen && (
@@ -1050,7 +1050,7 @@ function App() {
               items={sortedProfiles.map(p => p.id)}
               strategy={rectSortingStrategy}
             >
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5 items-start">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 items-start">
                 {sortedProfiles.map(profile => (
                   <SortableAccountCard
                     key={profile.id} 
